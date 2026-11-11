@@ -8,6 +8,8 @@ On `/landing`, the Incubics logo sits to the left of the Mattermost wordmark. Th
 
 Inside a channel, `kanban.js` adds a Kanban tab next to Messages. The tab shows the Focalboard board linked to that channel, with its status columns, and cards can be added or moved between columns.
 
+Each message has an Assign action. Choosing a person and a deadline creates a card on that board, and the message shows who owns it and when it is due.
+
 | Icon | Link |
 | --- | --- |
 | Windows | Mattermost desktop 6.3.2 MSI |
