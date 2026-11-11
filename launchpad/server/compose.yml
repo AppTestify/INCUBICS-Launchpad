@@ -12,6 +12,7 @@ services:
       - "${NGINX_HTTP_BIND}:80"
     volumes:
       - ./nginx/active.conf:/etc/nginx/conf.d/default.conf:ro
+      - ./nginx/routes.inc:/etc/nginx/launchpad/routes.inc:ro
     depends_on:
       - front
       - account
@@ -57,8 +58,10 @@ services:
     environment:
       - REDPANDA_SUPERUSER_USERNAME=${REDPANDA_ADMIN_USER}
       - REDPANDA_SUPERUSER_PASSWORD=${REDPANDA_ADMIN_PWD}
+    # Dev-container mode does not enable SASL, so a health check that sends credentials
+    # fails with ILLEGAL_SASL_STATE even while Kafka itself is up.
     healthcheck:
-      test: ['CMD', 'rpk', 'cluster', 'info', '-X', 'user=${REDPANDA_ADMIN_USER}', '-X', 'pass=${REDPANDA_ADMIN_PWD}']
+      test: ["CMD", "rpk", "cluster", "info"]
       interval: 10s
       timeout: 5s
       retries: 10
@@ -155,6 +158,8 @@ services:
       - ACCOUNTS_URL=http${SECURE:+s}://${HOST_ADDRESS}/_accounts
       - ACCOUNT_PORT=3000
       - QUEUE_CONFIG=redpanda:9092
+      - ADMIN_EMAILS=r.kumar@incubics.com
+      - DISABLE_SIGNUP=true
     restart: unless-stopped
     networks:
       - launchpad_net
@@ -196,6 +201,7 @@ services:
       - DEFAULT_LANGUAGE=${DEFAULT_LANGUAGE:-en}
       - LAST_NAME_FIRST=${LAST_NAME_FIRST:-true}
       - DISABLED_FEATURES=auto-translate,mailboxes
+      - DISABLE_SIGNUP=true
     restart: unless-stopped
     networks:
       - launchpad_net

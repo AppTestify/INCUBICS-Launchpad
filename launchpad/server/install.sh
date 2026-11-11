@@ -128,15 +128,35 @@ NGINX
 
 # ---- images ----------------------------------------------------------------------------------
 say "Pulling images (other containers on this server are not affected)..."
+# A loaded image that was never published (or a private package) makes `compose pull` fail for the
+# whole project, even with --policy missing. Keep going when every required image is already local.
+pull_ok=true
 if ! docker compose pull --quiet; then
   warn "Registry pull failed; using images already loaded on this server where present."
+  pull_ok=false
 fi
-if ! docker compose pull --quiet --policy missing; then
-  die "Could not pull images. If $LAUNCHPAD_REGISTRY is private, run:  docker login ghcr.io -u <github-user>  (token with read:packages), or load the workflow artifact with:  docker load -i launchpad-images.tar.gz  and re-run."
+if ! $pull_ok && ! docker compose pull --quiet --policy missing; then
+  missing=()
+  while IFS= read -r image; do
+    [ -n "$image" ] || continue
+    if ! docker image inspect "$image" >/dev/null 2>&1; then
+      missing+=("$image")
+    fi
+  done < <(docker compose config --images)
+  if [ ${#missing[@]} -gt 0 ]; then
+    printf 'Missing image: %s\n' "${missing[@]}" >&2
+    die "Could not pull images. If $LAUNCHPAD_REGISTRY is private, run:  docker login ghcr.io -u <github-user>  (token with read:packages), or load the workflow artifact with:  docker load -i launchpad-images.tar.gz  and re-run."
+  fi
+  say "Every required image is already on this server."
 fi
 
 say "Starting the launchpad project..."
-docker compose up -d
+if $pull_ok; then
+  docker compose up -d
+else
+  # Do not ask the registry again; a missing package would abort startup of images we already have.
+  docker compose up -d --pull never
+fi
 
 # ---- TLS when this stack owns 80/443 ---------------------------------------------------------
 if [ "$MODE" = edge ] && ! docker compose exec -T nginx test -f "/etc/letsencrypt/live/$DOMAIN/fullchain.pem"; then

@@ -14,14 +14,14 @@
 // limitations under the License.
 -->
 <script lang="ts">
-  import { type IntlString, Severity, Status } from '@hcengineering/platform'
+  import { type IntlString, type Status } from '@hcengineering/platform'
   import { signupStore } from '@hcengineering/analytics-providers'
   import { deviceOptionsStore as deviceInfo } from '@hcengineering/ui'
   import { onMount } from 'svelte'
 
   import { loginFormPaddingInline } from '../loginFormLayout'
 
-  import { type BottomAction, doLoginAsGuest, doLoginNavigate, LoginMethods } from '../index'
+  import { type BottomAction, LoginMethods } from '../index'
   import LoginPasswordForm from './LoginPasswordForm.svelte'
   import LoginOtpForm from './LoginOtpForm.svelte'
   import BottomActionComponent from './BottomAction.svelte'
@@ -59,31 +59,6 @@
       method = LoginMethods.Otp
     }
   }
-
-  async function guestLogin (): Promise<void> {
-    let status = new Status(Severity.INFO, login.status.ConnectingToServer, {})
-    const [loginStatus, result] = await doLoginAsGuest()
-    status = loginStatus
-
-    if (onLogin !== undefined) {
-      void onLogin(result, status)
-    } else {
-      await doLoginNavigate(
-        result,
-        (st) => {
-          status = st
-        },
-        navigateUrl
-      )
-    }
-  }
-
-  const loginAsGuest: BottomAction = {
-    i18n: login.string.LoginAsGuest,
-    func: () => {
-      void guestLogin()
-    }
-  }
 </script>
 
 {#if method === LoginMethods.Otp}
@@ -93,13 +68,4 @@
 {/if}
 <div class="actions" style:margin-inline-start={loginFormPaddingInline($deviceInfo.docWidth, $deviceInfo.docHeight)}>
   <BottomActionComponent action={method === LoginMethods.Otp ? loginWithPasswordAction : loginWithCodeAction} />
-  <div class="login-as-guest">
-    <BottomActionComponent action={loginAsGuest} />
-  </div>
 </div>
-
-<style lang="scss">
-  .login-as-guest {
-    margin-top: 1rem;
-  }
-</style>
