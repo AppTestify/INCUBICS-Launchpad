@@ -1,4 +1,7 @@
 (function () {
+  if (window.top !== window.self) return;
+  if ((window.location.pathname || "").indexOf("/plugins/") === 0) return;
+
   var LINKS = [
     {
       name: "Windows",
