@@ -33,6 +33,27 @@
       path.indexOf("/access_problem") === 0;
   }
 
+  function brandLanding() {
+    var path = window.location.pathname || "/";
+    if (path !== "/" && path.indexOf("/landing") !== 0) return;
+    var header = document.querySelector(".get-app__header");
+    if (!header) return;
+    header.classList.add("incubics-landing-header");
+    if (header.querySelector(".incubics-landing-logo")) return;
+
+    var logo = document.createElement("img");
+    logo.className = "incubics-landing-logo";
+    logo.src = "/brand/incubics-logo.png";
+    logo.alt = "Incubics";
+
+    var divider = document.createElement("span");
+    divider.className = "incubics-landing-divider";
+    divider.setAttribute("aria-hidden", "true");
+
+    header.insertBefore(divider, header.firstChild);
+    header.insertBefore(logo, header.firstChild);
+  }
+
   function render() {
     var footer = document.getElementById("incubics-app-footer");
     var show = onDownloadScreen();
@@ -58,23 +79,34 @@
     });
 
     document.body.appendChild(footer);
+    brandLanding();
   }
 
   var pushState = history.pushState;
   history.pushState = function () {
     pushState.apply(history, arguments);
-    render();
+    paint();
   };
   var replaceState = history.replaceState;
   history.replaceState = function () {
     replaceState.apply(history, arguments);
-    render();
+    paint();
   };
-  window.addEventListener("popstate", render);
-  window.addEventListener("hashchange", render);
-  if (document.body) {
+  function paint() {
     render();
+    brandLanding();
+  }
+
+  window.addEventListener("popstate", paint);
+  window.addEventListener("hashchange", paint);
+  var observer = new MutationObserver(paint);
+  function start() {
+    paint();
+    observer.observe(document.body, {childList: true, subtree: true});
+  }
+  if (document.body) {
+    start();
   } else {
-    document.addEventListener("DOMContentLoaded", render);
+    document.addEventListener("DOMContentLoaded", start);
   }
 })();
