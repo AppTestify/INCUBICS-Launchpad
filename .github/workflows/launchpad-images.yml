@@ -49,7 +49,20 @@ jobs:
         run: |
           owner=$(echo "${{ github.repository_owner }}" | tr '[:upper:]' '[:lower:]')
           echo "REGISTRY=ghcr.io/$owner" >> "$GITHUB_ENV"
-          LAUNCHPAD_REGISTRY="ghcr.io/$owner" LAUNCHPAD_VERSION="${GITHUB_SHA::12}" ./launchpad/build-images.sh
+          LAUNCHPAD_REGISTRY="ghcr.io/$owner" LAUNCHPAD_VERSION="${GITHUB_SHA::12}" \
+            LAUNCHPAD_SOURCE_URL="${{ github.server_url }}/${{ github.repository }}" ./launchpad/build-images.sh
+
+      # Fallback for when GHCR refuses the push (organisation package settings): the same images
+      # as one file, to copy to the server and load with `docker load -i launchpad-images.tar.gz`.
+      - name: Save images to a file
+        run: docker save "$REGISTRY/launchpad-front:latest" "$REGISTRY/launchpad-account:latest" | gzip > launchpad-images.tar.gz
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: launchpad-images
+          path: launchpad-images.tar.gz
+          retention-days: 14
+          compression-level: 0
 
       - name: Push images
         run: |

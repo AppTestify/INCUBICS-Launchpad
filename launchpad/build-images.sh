@@ -37,6 +37,7 @@ $rush package $targets
 
 for name in front account; do
   image="$registry/launchpad-$name"
-  docker build -t "$image:$version" -t "$image:latest" "pods/$name"
+  docker build ${LAUNCHPAD_SOURCE_URL:+--label "org.opencontainers.image.source=$LAUNCHPAD_SOURCE_URL"} \
+    -t "$image:$version" -t "$image:latest" "pods/$name"
   echo "Built $image:$version"
 done

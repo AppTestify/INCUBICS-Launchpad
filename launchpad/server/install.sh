@@ -126,7 +126,10 @@ NGINX
 # ---- images ----------------------------------------------------------------------------------
 say "Pulling images (other containers on this server are not affected)..."
 if ! docker compose pull --quiet; then
-  die "Could not pull images. If $LAUNCHPAD_REGISTRY is private, run:  docker login ghcr.io -u <github-user>  (token with read:packages), then re-run."
+  warn "Registry pull failed; using images already loaded on this server where present."
+fi
+if ! docker compose pull --quiet --policy missing; then
+  die "Could not pull images. If $LAUNCHPAD_REGISTRY is private, run:  docker login ghcr.io -u <github-user>  (token with read:packages), or load the workflow artifact with:  docker load -i launchpad-images.tar.gz  and re-run."
 fi
 
 say "Starting the launchpad project..."
