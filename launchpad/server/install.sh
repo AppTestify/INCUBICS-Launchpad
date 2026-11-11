@@ -9,12 +9,15 @@
 # Usage:   ./install.sh            install, or update to the newest images
 #          ./install.sh --check    only report what would happen, change nothing
 #
-# Optional environment: DOMAIN, LE_EMAIL, LAUNCHPAD_PORT, LAUNCHPAD_REGISTRY, LAUNCHPAD_VERSION, FORCE=1
+# Optional environment: DOMAIN, LE_EMAIL, LAUNCHPAD_BIND, LAUNCHPAD_PORT, LAUNCHPAD_REGISTRY, LAUNCHPAD_VERSION, FORCE=1
 set -euo pipefail
 cd "$(dirname "$0")"
 
 DOMAIN=${DOMAIN:-launchpad.incubics.com}
 LE_EMAIL=${LE_EMAIL:-}
+# Address this stack's nginx binds to when another proxy owns 80/443. Use the docker0 address
+# (usually 172.17.0.1) when that proxy is itself a container, since it cannot reach 127.0.0.1.
+BIND_IP=${LAUNCHPAD_BIND:-127.0.0.1}
 CHECK_ONLY=false
 [ "${1:-}" = "--check" ] && CHECK_ONLY=true
 
@@ -44,10 +47,10 @@ if [ -f .env ]; then
 elif port_busy 80 || port_busy 443; then
   MODE=behind
   say "Ports 80/443 are already used on this server by: $(port_owner 80) $(port_owner 443)"
-  say "LaunchPad's nginx will listen on 127.0.0.1 only and will not disturb it."
+  say "LaunchPad's nginx will listen on $BIND_IP only and will not disturb it."
   PORT=${LAUNCHPAD_PORT:-18087}
   while port_busy "$PORT"; do PORT=$((PORT + 1)); done
-  say "Chosen local port: 127.0.0.1:$PORT"
+  say "Chosen local address: $BIND_IP:$PORT"
 else
   MODE=edge
   say "Ports 80 and 443 are free: LaunchPad's own nginx will serve https://$DOMAIN directly."
@@ -66,7 +69,7 @@ if [ ! -f .env ]; then
   if [ "$MODE" = edge ]; then
     bind="0.0.0.0:80"; files="compose.yml:compose.edge.yml"
   else
-    bind="127.0.0.1:$PORT"; files="compose.yml"
+    bind="$BIND_IP:$PORT"; files="compose.yml"
   fi
   umask 077
   cat > .env <<ENV
