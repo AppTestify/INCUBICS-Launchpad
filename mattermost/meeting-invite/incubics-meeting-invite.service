@@ -1,0 +1,13 @@
+[Unit]
+Description=Incubics channel meeting calendar invites
+After=network.target
+
+[Service]
+ExecStart=/usr/bin/python3 /opt/mattermost/meeting-invite/invite.py
+Restart=on-failure
+RestartSec=2
+User=root
+NoNewPrivileges=true
+
+[Install]
+WantedBy=multi-user.target
