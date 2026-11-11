@@ -1,0 +1,132 @@
+#incubics-meetings-pane {
+  display: none;
+  position: fixed;
+  z-index: 21;
+  box-sizing: border-box;
+  padding: 20px 24px;
+  overflow: auto;
+  background: #f4f5f7;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #1c2330;
+}
+
+body.incubics-meetings-on #incubics-meetings-pane {
+  display: block;
+}
+
+.incubics-meetings-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.incubics-meetings-bar h2 {
+  margin: 0;
+  font-size: 18px;
+}
+
+.incubics-meetings-bar button,
+.incubics-meetings-form button,
+.incubics-meeting-cancel {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: transparent;
+  color: #3d4a5c;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.incubics-meetings-bar button,
+.incubics-meetings-form button[type="submit"] {
+  background: #14a37a;
+  color: #ffffff;
+}
+
+.incubics-meetings-form[hidden] {
+  display: none;
+}
+
+.incubics-meetings-form {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 0.8fr 1fr;
+  gap: 12px;
+  margin-bottom: 16px;
+  padding: 16px;
+  background: #ffffff;
+  border: 1px solid #e4e8ee;
+  border-radius: 10px;
+}
+
+.incubics-meetings-form label {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  color: #3d4a5c;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.incubics-meetings-form input,
+.incubics-meetings-form select {
+  box-sizing: border-box;
+  width: 100%;
+  padding: 8px;
+  border: 1px solid #d0d7e2;
+  border-radius: 6px;
+  color: #1c2330;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 400;
+}
+
+.incubics-meetings-actions {
+  display: flex;
+  align-items: flex-end;
+  gap: 8px;
+}
+
+.incubics-meetings-note,
+.incubics-meetings-empty {
+  margin: 0 0 12px;
+  color: #5d6573;
+  font-size: 14px;
+}
+
+.incubics-meeting-card {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 10px;
+  padding: 14px 16px;
+  background: #ffffff;
+  border: 1px solid #e4e8ee;
+  border-radius: 10px;
+}
+
+.incubics-meeting-card strong {
+  display: block;
+  margin-bottom: 4px;
+  font-size: 15px;
+}
+
+.incubics-meeting-card p {
+  margin: 0;
+  color: #5d6573;
+  font-size: 13px;
+}
+
+.incubics-meeting-card .incubics-meeting-cancel {
+  margin-left: auto;
+  color: #c23934;
+}
+
+@media (max-width: 900px) {
+  .incubics-meetings-form {
+    grid-template-columns: 1fr;
+  }
+}

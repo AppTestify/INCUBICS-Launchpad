@@ -10,6 +10,8 @@ Inside a channel, `kanban.js` adds a Kanban tab next to Messages. The tab shows 
 
 Each message has an Assign action. Choosing a person and a deadline creates a card on that board, and the message shows who owns it and when it is due.
 
+`meetings.js` adds a Meetings tab in the same channel. A member can schedule a meeting with a date, time, length, and a repeat of none, daily, weekdays, weekly, or monthly. The meeting is posted and pinned in the channel, and the tab lists the next time it happens.
+
 | Icon | Link |
 | --- | --- |
 | Windows | Mattermost desktop 6.3.2 MSI |
