@@ -189,33 +189,86 @@
     pane.id = "incubics-meetings-pane";
     pane.innerHTML = '<div class="incubics-meetings-bar"><h2>Meetings</h2><button type="button" data-schedule>Schedule a meeting</button></div>' +
       '<p class="incubics-meetings-note" hidden></p>' +
-      '<form class="incubics-meetings-form" hidden>' +
+      '<div class="incubics-meetings-list"></div>';
+    pane.addEventListener("click", function (event) {
+      event.stopPropagation();
+      if (event.target.closest("[data-schedule]")) openDialog();
+      var cancel = event.target.closest("[data-cancel]");
+      if (cancel) removeMeeting(cancel.getAttribute("data-cancel"));
+    });
+    document.body.appendChild(pane);
+    return pane;
+  }
+
+  function formMarkup() {
+    return '<h2>Schedule a meeting</h2>' +
+      '<p class="incubics-meeting-dialog-lead">Choose a one-time meeting or a repeat. Everyone in this channel receives a calendar invite.</p>' +
       '<label>Title<input name="title" type="text" maxlength="120" required placeholder="Sprint review"></label>' +
       '<label>Date<input name="date" type="date" required></label>' +
       '<label>Time<input name="time" type="time" required></label>' +
       '<label>Length<select name="duration"><option value="15">15 min</option><option value="30" selected>30 min</option><option value="45">45 min</option><option value="60">60 min</option><option value="90">90 min</option></select></label>' +
       '<label>Repeat<select name="recurrence"><option value="none">Does not repeat</option><option value="daily">Daily</option><option value="weekdays">Every weekday</option><option value="weekly">Weekly</option><option value="monthly">Monthly</option></select></label>' +
-      '<div class="incubics-meetings-actions"><button type="submit">Save</button><button type="button" data-close>Close</button></div>' +
-      '</form><div class="incubics-meetings-list"></div>';
-    pane.addEventListener("click", function (event) {
-      event.stopPropagation();
-      if (event.target.closest("[data-schedule]")) {
-        var form = pane.querySelector("form");
-        form.hidden = !form.hidden;
-        if (!form.hidden) form.elements.title.focus();
-      }
-      var cancel = event.target.closest("[data-cancel]");
-      if (cancel) removeMeeting(cancel.getAttribute("data-cancel"));
-      if (event.target.hasAttribute("data-close")) pane.querySelector("form").hidden = true;
+      '<p class="incubics-meetings-note" hidden></p>' +
+      '<div class="incubics-meetings-actions"><button type="submit">Send invite</button><button type="button" data-close>Close</button></div>';
+  }
+
+  function ensureDialog() {
+    var dialog = document.getElementById("incubics-meeting-dialog");
+    if (dialog) return dialog;
+    dialog = document.createElement("div");
+    dialog.id = "incubics-meeting-dialog";
+    dialog.hidden = true;
+    dialog.innerHTML = '<form class="incubics-meeting-dialog-form">' + formMarkup() + '</form>';
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog || event.target.hasAttribute("data-close")) dialog.hidden = true;
     });
-    var form = pane.querySelector("form");
-    form.dataset.bound = "1";
-    form.addEventListener("submit", function (event) {
+    dialog.querySelector("form").addEventListener("submit", function (event) {
       event.preventDefault();
       saveMeeting(new FormData(event.currentTarget));
     });
-    document.body.appendChild(pane);
-    return pane;
+    document.body.appendChild(dialog);
+    return dialog;
+  }
+
+  function setDialogNote(text) {
+    var note = document.querySelector("#incubics-meeting-dialog .incubics-meetings-note");
+    if (!note) return;
+    note.hidden = !text;
+    note.textContent = text || "";
+  }
+
+  function openDialog() {
+    var route = channelRoute();
+    if (!route) return;
+    var dialog = ensureDialog();
+    dialog.hidden = false;
+    var form = dialog.querySelector("form");
+    var title = form.elements.title;
+    if (title && !title.value) title.focus();
+  }
+
+  function ensureHeaderButton() {
+    var bar = document.querySelector("#channel-header") || document.querySelector(".channel-header");
+    if (!bar) return;
+    var icons = bar.querySelector(".channel-header__icons") || bar.querySelector(".channel-header__top") || bar;
+    var button = document.getElementById("incubics-schedule-meeting");
+    if (!button) {
+      button = document.createElement("button");
+      button.id = "incubics-schedule-meeting";
+      button.type = "button";
+      button.textContent = "Schedule meeting";
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        openDialog();
+      });
+    }
+    if (button.parentElement !== icons) icons.appendChild(button);
+  }
+
+  function removeHeaderButton() {
+    var button = document.getElementById("incubics-schedule-meeting");
+    if (button) button.remove();
   }
 
   function setNote(text) {
@@ -243,6 +296,8 @@
     document.body.classList.remove("incubics-meetings-on");
     var pane = document.getElementById("incubics-meetings-pane");
     if (pane) pane.remove();
+    var dialog = document.getElementById("incubics-meeting-dialog");
+    if (dialog) dialog.hidden = true;
     loadedKey = "";
     meetings = [];
     current = null;
@@ -307,23 +362,93 @@
     });
   }
 
+  function ensureChannel() {
+    var route = channelRoute();
+    if (!route) return Promise.reject(new Error("route"));
+    var key = route.team + "/" + route.channel;
+    if (current && current.key === key) return Promise.resolve(current);
+    return api("/api/v4/teams/name/" + encodeURIComponent(route.team)).then(function (team) {
+      return api("/api/v4/teams/" + team.id + "/channels/name/" + encodeURIComponent(route.channel)).then(function (channel) {
+        current = {key: key, team: team, channel: channel};
+        return current;
+      });
+    });
+  }
+
+  function icsEscape(value) {
+    return String(value).replace(/\\/g, "\\\\").replace(/\n/g, "\\n").replace(/,/g, "\\,").replace(/;/g, "\\;");
+  }
+
+  function icsStamp(ms) {
+    return new Date(ms).toISOString().replace(/[-:]/g, "").replace(/\.\d{3}Z$/, "Z");
+  }
+
+  function rrule(recurrence) {
+    if (recurrence === "daily") return "FREQ=DAILY";
+    if (recurrence === "weekdays") return "FREQ=WEEKLY;BYDAY=MO,TU,WE,TH,FR";
+    if (recurrence === "weekly") return "FREQ=WEEKLY";
+    if (recurrence === "monthly") return "FREQ=MONTHLY";
+    return "";
+  }
+
+  function buildIcs(meeting, uid) {
+    var lines = [
+      "BEGIN:VCALENDAR",
+      "PRODID:-//Incubics//Launchpad//EN",
+      "VERSION:2.0",
+      "CALSCALE:GREGORIAN",
+      "METHOD:PUBLISH",
+      "BEGIN:VEVENT",
+      "UID:" + uid,
+      "DTSTAMP:" + icsStamp(Date.now()),
+      "DTSTART:" + icsStamp(meeting.startAt),
+      "DTEND:" + icsStamp(meeting.startAt + meeting.durationMin * 60000),
+      "SUMMARY:" + icsEscape(meeting.title),
+      "DESCRIPTION:" + icsEscape(recurrenceLabel(meeting.recurrence) + ". Scheduled in this channel.")
+    ];
+    var rule = rrule(meeting.recurrence);
+    if (rule) lines.push("RRULE:" + rule);
+    lines.push("END:VEVENT", "END:VCALENDAR");
+    return lines.join("\r\n") + "\r\n";
+  }
+
+  function uploadIcs(channelId, filename, text) {
+    var body = new FormData();
+    body.append("channel_id", channelId);
+    body.append("files", new Blob([text], {type: "text/calendar"}), filename);
+    var headers = {"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"};
+    var token = csrf();
+    if (token) headers["X-CSRF-Token"] = token;
+    return fetch("/api/v4/files", {method: "POST", credentials: "same-origin", headers: headers, body: body}).then(function (response) {
+      if (!response.ok) throw new Error(String(response.status));
+      return response.json();
+    }).then(function (payload) {
+      var infos = payload.file_infos || [];
+      return infos.length ? infos[0].id : "";
+    });
+  }
+
+  function inviteNote(result) {
+    if (!result) return "Scheduled in the channel. The calendar invite email could not be sent.";
+    if (result.sent > 0 && !result.failed) return "Scheduled. A calendar invite was emailed to " + result.sent + (result.sent === 1 ? " person" : " people") + " in this channel.";
+    if (result.sent > 0) return "Scheduled. Calendar invites were emailed to " + result.sent + " people. " + result.failed + " could not be delivered.";
+    if (!result.failed) return "Scheduled in the channel. Nobody in this channel has an email address, so no calendar invite was sent.";
+    return "Scheduled in the channel. The calendar invite could not be delivered.";
+  }
+
   function saveMeeting(form) {
-    if (!current) {
-      setNote("This channel is still opening. Try saving again.");
-      return;
-    }
     var title = String(form.get("title") || "").trim();
     var date = String(form.get("date") || "");
     var time = String(form.get("time") || "");
     var match = /^(\d{4})-(\d{2})-(\d{2})$/.exec(date);
     var clock = /^(\d{2}):(\d{2})$/.exec(time);
     if (!title || !match || !clock) {
-      setNote("Add a title, date, and time.");
+      setDialogNote("Add a title, date, and time.");
       return;
     }
     var startAt = atIst(+match[1], +match[2], +match[3], +clock[1], +clock[2]);
     if (!startAt || startAt < Date.now() - 60000) {
-      setNote("Choose a time that is still ahead.");
+      setDialogNote("Choose a time that is still ahead.");
       return;
     }
     var meeting = {
@@ -332,26 +457,37 @@
       durationMin: Number(form.get("duration")) || 30,
       recurrence: String(form.get("recurrence") || "none")
     };
-    var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence);
+    var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence) + "\nA calendar invite is being emailed to this channel.";
     loadGen += 1;
-    setNote("Saving the meeting…");
-    api("/api/v4/posts", {
-      method: "POST",
-      body: {channel_id: current.channel.id, message: message, props: {incubics_meeting: meeting}}
+    setDialogNote("Sending the calendar invite…");
+    ensureChannel().then(function (context) {
+      var filename = meeting.title.replace(/[^\w.-]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "meeting";
+      return uploadIcs(context.channel.id, filename + ".ics", buildIcs(meeting, "incubics-" + Date.now() + "@launchpad.incubics.com")).catch(function () {
+        return "";
+      }).then(function (fileId) {
+        var body = {channel_id: context.channel.id, message: message, props: {incubics_meeting: meeting}};
+        if (fileId) body.file_ids = [fileId];
+        return api("/api/v4/posts", {method: "POST", body: body});
+      });
     }).then(function (post) {
-      return api("/api/v4/posts/" + post.id + "/pin", {method: "POST"}).catch(function () { return post; }).then(function () { return post; });
-    }).then(function (post) {
-      var saved = readMeeting(post) || Object.assign({postId: post.id, userId: post.user_id}, meeting);
-      meetings.push(saved);
-      var pane = document.getElementById("incubics-meetings-pane");
-      if (pane) {
-        pane.querySelector("form").reset();
-        pane.querySelector("form").hidden = true;
-      }
+      return api("/api/v4/posts/" + post.id + "/pin", {method: "POST"}).catch(function () { return post; }).then(function () {
+        return api("/brand/meeting-invite", {method: "POST", body: {channel_id: post.channel_id, post_id: post.id}}).then(function (result) {
+          return {post: post, result: result};
+        }).catch(function () {
+          return {post: post, result: null};
+        });
+      });
+    }).then(function (saved) {
+      var post = saved.post;
+      var item = readMeeting(post) || Object.assign({postId: post.id, userId: post.user_id}, meeting);
+      meetings.push(item);
+      var dialog = document.getElementById("incubics-meeting-dialog");
+      if (dialog) dialog.querySelector("form").reset();
       renderList();
-      setNote("Scheduled. People in this channel can see it here and in the messages.");
+      setNote(inviteNote(saved.result));
+      setDialogNote(inviteNote(saved.result));
     }).catch(function () {
-      setNote("The meeting could not be scheduled.");
+      setDialogNote("The meeting could not be scheduled.");
     });
   }
 
@@ -368,8 +504,18 @@
 
   function paint() {
     var route = channelRoute();
-    if (!route || !meetingsActive()) {
-      if (document.body.classList.contains("incubics-meetings-on")) hide();
+    if (!route) {
+      removeHeaderButton();
+      if (document.body.classList.contains("incubics-meetings-on") || document.getElementById("incubics-meeting-dialog")) hide();
+      return;
+    }
+    ensureHeaderButton();
+    if (!meetingsActive()) {
+      if (document.body.classList.contains("incubics-meetings-on")) {
+        document.body.classList.remove("incubics-meetings-on");
+        var pane = document.getElementById("incubics-meetings-pane");
+        if (pane) pane.remove();
+      }
       return;
     }
     var pane = ensurePane();
