@@ -1,0 +1,6 @@
+<svg xmlns="http://www.w3.org/2000/svg" width="32" height="32" viewBox="0 0 32 32">
+  <style>.t{fill:#0b0d11}@media (prefers-color-scheme:dark){.t{fill:#fff}}</style>
+  <path class="t" d="M16 1.5 29.4 8.75 16 16 2.6 8.75z"/>
+  <path fill="#0e7a5a" d="M2.6 8.75 16 16v14.5L2.6 23.25z"/>
+  <path fill="#3cd9a4" d="M16 16 29.4 8.75v14.5L16 30.5z"/>
+</svg>

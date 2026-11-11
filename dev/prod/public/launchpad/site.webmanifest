@@ -1,0 +1,12 @@
+{
+  "name": "LaunchPad-INCUBICS",
+  "short_name": "LaunchPad",
+  "display": "standalone",
+  "icons": [
+    { "src": "/launchpad/icon-192.png", "type": "image/png", "sizes": "192x192" },
+    { "src": "/launchpad/icon-512.png", "type": "image/png", "sizes": "512x512" },
+    { "src": "/launchpad/icon-1024.png", "type": "image/png", "sizes": "1024x1024" }
+  ],
+  "start_url": "/",
+  "scope": "/"
+}

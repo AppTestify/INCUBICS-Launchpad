@@ -1,3 +1,16 @@
+# LaunchPad-INCUBICS
+
+LaunchPad-INCUBICS is the INCUBICS team workspace (chat, project management, documents), hosted at
+`launchpad.incubics.com`. It is a rebranded build of the open-source
+[Huly Platform](https://github.com/hcengineering/platform), release `v0.7.432`, used under the
+Eclipse Public License 2.0 (see `LICENSE`). Changes made to the upstream source in this repository
+remain available under the same license.
+
+- Deployment, search-engine exclusion and the list of rebranded files: [`launchpad/README.md`](launchpad/README.md)
+- Everything below is the upstream Huly Platform README and applies unchanged to development.
+
+---
+
 # Huly Platform
 
 [![X (formerly Twitter) Follow](https://img.shields.io/twitter/follow/huly_io?style=for-the-badge)](https://x.com/huly_io)

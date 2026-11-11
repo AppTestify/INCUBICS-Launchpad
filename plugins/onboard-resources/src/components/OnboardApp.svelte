@@ -28,11 +28,10 @@
     setMetadataLocalStorage,
     themeStore
   } from '@hcengineering/ui'
-  import workbench from '@hcengineering/workbench'
   import { onDestroy, onMount } from 'svelte'
 
   import Auth from './Auth.svelte'
-  import LoginIcon from './icons/OnboardIcon.svelte'
+  import brandLogo from '../../img/incubics-logo-white.png'
   import OnboardForm from './OnboardForm.svelte'
 
   import loginBack from '../../img/login_back.png'
@@ -107,7 +106,7 @@
       style:top={'3rem'}
       class="flex-row-center"
     >
-      <LoginIcon /><span class="fs-title ml-2">{getMetadata(workbench.metadata.PlatformTitle)}</span>
+      <img src={brandLogo} height="28" alt="INCUBICS" /><span class="brand-divider" /><span class="fs-title">LaunchPad</span>
     </div>
 
     <div class="panel-base" class:panel={$deviceInfo.docWidth > 768} class:white={!$themeStore.dark}>
@@ -127,6 +126,12 @@
 </div>
 
 <style lang="scss">
+  .brand-divider {
+    width: 1px;
+    height: 1.25rem;
+    margin: 0 0.75rem;
+    background-color: rgba(255, 255, 255, 0.4);
+  }
   .back-image {
     position: fixed;
     top: 32px;

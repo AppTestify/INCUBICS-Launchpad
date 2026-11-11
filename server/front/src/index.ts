@@ -306,6 +306,19 @@ export function start (
   setInterval(cleanupTempFiles, 1000 * 60 * 15) // Run every 15 minutes
 
   app.use(cors())
+
+  // LaunchPad-INCUBICS is a private deployment: ask search engines not to index anything served from here.
+  // Crawling stays allowed in robots.txt on purpose, a crawler has to fetch a page to see the noindex directive.
+  // Set ALLOW_SEARCH_INDEXING=true to turn this off.
+  if (process.env.ALLOW_SEARCH_INDEXING !== 'true') {
+    app.use((req, res, next) => {
+      res.setHeader('X-Robots-Tag', 'noindex, nofollow, noarchive, nosnippet')
+      next()
+    })
+    app.get('/robots.txt', (req, res) => {
+      res.type('text/plain').send('User-agent: *\nAllow: /\n')
+    })
+  }
   app.use(
     fileUpload({
       useTempFiles: true,
