@@ -16,6 +16,8 @@ targets="--to @hcengineering/pod-front --to @hcengineering/pod-account"
 
 # The web bundle does not fit in Node's default heap.
 export NODE_OPTIONS="${NODE_OPTIONS:---max-old-space-size=6144}"
+# Rush treats any stderr output as a warning and exits non-zero; silence the stale-data notice.
+export BROWSERSLIST_IGNORE_OLD_DATA=1
 
 # The build reads the platform and data-model version from the nearest git tag. Without one it
 # falls back to 0.6.0, which the upstream services of this release refuse to work with. Create the
