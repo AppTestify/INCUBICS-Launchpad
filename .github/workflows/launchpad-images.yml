@@ -33,7 +33,7 @@ jobs:
           node-version-file: '.nvmrc'
 
       - name: Cache Rush store
-        uses: actions/cache@v4
+        uses: actions/cache@v6
         with:
           path: common/temp
           key: ${{ runner.os }}-launchpad-${{ hashFiles('common/config/rush/pnpm-lock.yaml') }}
