@@ -14,6 +14,7 @@
   var loadedKey = "";
   var loadGen = 0;
   var current = null;
+  var listed = {};
 
   function channelRoute() {
     var match = window.location.pathname.match(/^\/([^/]+)\/channels\/([^/]+)/);
@@ -58,6 +59,33 @@
     return document.querySelector("#channel_view") ||
       document.querySelector(".channel-view") ||
       (header() && header().parentElement);
+  }
+
+  function sessionToken() {
+    try {
+      var preferred = ["token", "MMAUTHTOKEN", "MMTOKEN"];
+      var index;
+      for (index = 0; index < preferred.length; index++) {
+        var direct = localStorage.getItem(preferred[index]);
+        if (direct) return direct;
+      }
+      var keys = Object.keys(localStorage);
+      for (index = 0; index < keys.length; index++) {
+        if (!/token/i.test(keys[index])) continue;
+        var value = localStorage.getItem(keys[index]) || "";
+        if (/^[a-z0-9]{26}$/.test(value)) return value;
+      }
+    } catch (err) {}
+    return "";
+  }
+
+  function fileHeaders() {
+    var headers = {"Accept": "*/*", "X-Requested-With": "XMLHttpRequest"};
+    var token = csrf();
+    if (token) headers["X-CSRF-Token"] = token;
+    var session = sessionToken();
+    if (session) headers.Authorization = "Bearer " + session;
+    return headers;
   }
 
   function filesActive() {
@@ -128,7 +156,12 @@
     pane.innerHTML = '<div class="incubics-files-bar"><div><h2>Files</h2><p>Stored on the Launchpad server. Each file can be up to 100 MB.</p></div>' +
       '<label class="incubics-files-upload">Upload<input type="file" multiple></label></div>' +
       '<p class="incubics-files-note" hidden></p><div class="incubics-files-list"></div>';
-    pane.addEventListener("click", function (event) { event.stopPropagation(); });
+    pane.addEventListener("click", function (event) {
+      event.stopPropagation();
+      var row = event.target.closest("[data-file]");
+      if (!row) return;
+      openFile(listed[row.getAttribute("data-file")]);
+    });
     pane.querySelector("input").addEventListener("change", function (event) {
       var input = event.currentTarget;
       var files = input.files ? Array.prototype.slice.call(input.files) : [];
@@ -147,21 +180,84 @@
     current = null;
   }
 
+  function canPreview(file) {
+    var type = file && file.mime_type || "";
+    var name = file && file.name || "";
+    return /^(image\/|text\/|application\/pdf)/.test(type) || /\.(png|jpe?g|gif|webp|txt|pdf|csv|json|md)$/i.test(name);
+  }
+
   function render(files) {
     var list = document.querySelector("#incubics-files-pane .incubics-files-list");
     if (!list) return;
+    listed = {};
     if (!files.length) {
       list.innerHTML = '<p class="incubics-files-empty">No files in this channel yet.</p>';
       return;
     }
     list.innerHTML = files.map(function (file) {
+      listed[file.id] = file;
       var image = /^image\//.test(file.mime_type || "");
       var thumb = image ? '<img src="/api/v4/files/' + encodeURIComponent(file.id) + '/thumbnail" alt="">' : '<span class="incubics-files-ext">' + escapeHtml((file.extension || "file").slice(0, 4)) + "</span>";
-      return '<a class="incubics-files-row" href="/api/v4/files/' + encodeURIComponent(file.id) + '" target="_blank" rel="noopener">' +
+      return '<button type="button" class="incubics-files-row" data-file="' + escapeHtml(file.id) + '">' +
         thumb +
         '<span class="incubics-files-name">' + escapeHtml(file.name || "File") + "</span>" +
-        '<span class="incubics-files-meta">' + escapeHtml(formatSize(file.size)) + " · " + escapeHtml(formatWhen(file.create_at)) + "</span></a>";
+        '<span class="incubics-files-meta">' + escapeHtml(formatSize(file.size)) + " · " + escapeHtml(formatWhen(file.create_at)) + "</span></button>";
     }).join("");
+  }
+
+  function openFile(file) {
+    if (!file || !file.id) return;
+    var preview = canPreview(file) ? window.open("", "_blank") : null;
+    setNote("Opening " + (file.name || "file") + "…");
+    fetch("/api/v4/files/" + encodeURIComponent(file.id), {
+      method: "GET",
+      credentials: "same-origin",
+      headers: fileHeaders()
+    }).then(function (response) {
+      if (!response.ok) throw new Error(String(response.status));
+      var headerType = (response.headers.get("Content-Type") || file.mime_type || "application/octet-stream").split(";")[0];
+      return response.blob().then(function (blob) {
+        return blob.type === headerType ? blob : new Blob([blob], {type: headerType});
+      });
+    }).then(function (blob) {
+      var type = blob.type || "";
+      if (preview && !preview.closed && type.indexOf("text/") === 0) {
+        return blob.text().then(function (text) {
+          var body = preview.document.body;
+          body.textContent = "";
+          var pre = preview.document.createElement("pre");
+          pre.style.whiteSpace = "pre-wrap";
+          pre.style.fontFamily = "inherit";
+          pre.textContent = text;
+          body.appendChild(pre);
+          preview.document.title = file.name || "File";
+          setNote("");
+        });
+      }
+      var url = URL.createObjectURL(blob);
+      if (preview && !preview.closed && type.indexOf("image/") === 0) {
+        var image = preview.document.createElement("img");
+        image.alt = file.name || "";
+        image.src = url;
+        preview.document.body.textContent = "";
+        preview.document.body.appendChild(image);
+      } else if (preview && !preview.closed && type === "application/pdf") {
+        preview.location.href = url;
+      } else {
+        if (preview && !preview.closed) preview.close();
+        var link = document.createElement("a");
+        link.href = url;
+        link.download = file.name || "download";
+        document.body.appendChild(link);
+        link.click();
+        link.remove();
+      }
+      setNote("");
+      setTimeout(function () { URL.revokeObjectURL(url); }, 120000);
+    }).catch(function () {
+      if (preview && !preview.closed) preview.close();
+      setNote("The file could not be opened.");
+    });
   }
 
   function fromPosts(channelId) {

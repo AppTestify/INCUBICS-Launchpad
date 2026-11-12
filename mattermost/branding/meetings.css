@@ -120,6 +120,11 @@ body.incubics-meetings-on #incubics-meetings-pane {
   font-size: 13px;
 }
 
+.incubics-meeting-card a {
+  color: #0b6b4a;
+  word-break: break-all;
+}
+
 .incubics-meeting-card .incubics-meeting-cancel {
   margin-left: auto;
   color: #c23934;

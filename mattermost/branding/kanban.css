@@ -493,6 +493,12 @@ body.incubics-kanban-on #incubics-kanban-pane {
   color: #ffffff;
 }
 
+.incubics-ticket-actions [data-delete] {
+  margin-left: auto;
+  background: transparent;
+  color: #b42318;
+}
+
 .incubics-ticket-actions button:disabled {
   opacity: 0.6;
   cursor: default;

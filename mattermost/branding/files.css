@@ -66,12 +66,16 @@ body.incubics-files-on #incubics-files-pane {
   display: flex;
   align-items: center;
   gap: 12px;
+  width: 100%;
   padding: 10px 12px;
   background: #ffffff;
   border: 1px solid #e6ebf2;
   border-radius: 8px;
   color: inherit;
+  font: inherit;
+  text-align: left;
   text-decoration: none;
+  cursor: pointer;
 }
 
 .incubics-files-row:hover {

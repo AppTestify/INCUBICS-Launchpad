@@ -7,6 +7,7 @@ import ssl
 import sys
 import time
 import urllib.error
+import urllib.parse
 import urllib.request
 from email.message import EmailMessage
 from email.utils import formataddr
@@ -15,6 +16,7 @@ from http.server import BaseHTTPRequestHandler, ThreadingHTTPServer
 CONFIG_PATH = "/opt/mattermost/volumes/app/mattermost/config/config.json"
 MATTERMOST = "http://127.0.0.1:18088"
 ALLOWED_ORIGIN = "https://launchpad.incubics.com"
+SITE_URL = "https://launchpad.incubics.com"
 RECURRENCES = {"none", "daily", "weekdays", "weekly", "monthly"}
 DURATIONS = {15, 30, 45, 60, 90}
 RECENT_MS = 10 * 60 * 1000
@@ -120,6 +122,27 @@ def recurrence_label(recurrence):
     }.get(recurrence, "Does not repeat")
 
 
+def channel_link(token, channel_id):
+    status, channel = mm("GET", "/api/v4/channels/" + channel_id, token)
+    if status != 200 or not isinstance(channel, dict):
+        return ""
+    team_id = str(channel.get("team_id") or "")
+    channel_name = str(channel.get("name") or "")
+    if not team_id or not channel_name:
+        return ""
+    status, team = mm("GET", "/api/v4/teams/" + team_id, token)
+    if status != 200 or not isinstance(team, dict):
+        return ""
+    team_name = str(team.get("name") or "")
+    if not re.fullmatch(r"[A-Za-z0-9_-]+", team_name) or not re.fullmatch(r"[A-Za-z0-9_-]+", channel_name):
+        return ""
+    return SITE_URL + "/" + urllib.parse.quote(team_name, safe="") + "/channels/" + urllib.parse.quote(channel_name, safe="")
+
+
+def unfold(text):
+    return re.sub(r"\r\n[ \t]", "", text)
+
+
 def fold(line):
     encoded = line.encode("utf-8")
     if len(encoded) <= 75:
@@ -133,8 +156,11 @@ def fold(line):
     return "\r\n".join(chunks)
 
 
-def build_ics(meeting, organizer, attendees, uid):
+def build_ics(meeting, organizer, attendees, uid, link):
     end = meeting["startAt"] + meeting["durationMin"] * 60000
+    description = "Scheduled in a channel on Incubics Launchpad. " + recurrence_label(meeting["recurrence"])
+    if link:
+        description += "\nJoin: " + link
     lines = [
         "BEGIN:VCALENDAR",
         "PRODID:-//Incubics//Launchpad//EN",
@@ -147,11 +173,15 @@ def build_ics(meeting, organizer, attendees, uid):
         "DTSTART:" + ics_stamp(meeting["startAt"]),
         "DTEND:" + ics_stamp(end),
         "SUMMARY:" + ics_escape(meeting["title"]),
-        "DESCRIPTION:" + ics_escape("Scheduled in a channel on Incubics Launchpad. " + recurrence_label(meeting["recurrence"])),
+        "DESCRIPTION:" + ics_escape(description),
+    ]
+    if link:
+        lines.append("URL:" + ics_escape(link))
+    lines.extend([
         "ORGANIZER;CN=" + ics_escape(organizer["name"]) + ":mailto:" + organizer["email"],
         "STATUS:CONFIRMED",
         "SEQUENCE:0",
-    ]
+    ])
     rule = rrule(meeting["recurrence"])
     if rule:
         lines.append("RRULE:" + rule)
@@ -200,8 +230,11 @@ def channel_people(token, channel_id):
     return 200, people
 
 
-def send_messages(settings, meeting, organizer, attendees, uid):
-    ics = build_ics(meeting, organizer, attendees, uid)
+def send_messages(settings, meeting, organizer, attendees, uid, link):
+    ics = build_ics(meeting, organizer, attendees, uid, link)
+    flat = unfold(ics)
+    has_url = bool(link) and ("URL:" + link) in flat and link in flat.split("DESCRIPTION:", 1)[-1]
+    log("invite-ics has_url=%s" % ("yes" if has_url else "no"))
     when = time.strftime("%d %b %Y, %H:%M UTC", time.gmtime(meeting["startAt"] / 1000))
     plain = (
         organizer["name"]
@@ -213,6 +246,7 @@ def send_messages(settings, meeting, organizer, attendees, uid):
         + str(meeting["durationMin"])
         + " min · "
         + recurrence_label(meeting["recurrence"])
+        + ("\n\nJoin: " + link if link else "")
         + "\n\nOpen the attached invite to add it to your calendar."
     )
     host = settings.get("SMTPServer")
@@ -345,6 +379,7 @@ class Handler(BaseHTTPRequestHandler):
             }
         stamps.append(now)
         recent[me["id"]] = stamps
+        link = channel_link(token, channel_id)
         try:
             sent, failed = send_messages(
                 load_email_settings(),
@@ -352,6 +387,7 @@ class Handler(BaseHTTPRequestHandler):
                 organizer,
                 people,
                 "incubics-meeting-" + post_id + "@launchpad.incubics.com",
+                link,
             )
         except Exception as error:
             log("invite-smtp-failed " + type(error).__name__)

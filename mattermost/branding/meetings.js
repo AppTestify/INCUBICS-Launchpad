@@ -15,6 +15,7 @@
   var meetings = [];
   var current = null;
   var loadGen = 0;
+  var loading = false;
 
   function channelRoute() {
     var match = window.location.pathname.match(/^\/([^/]+)\/channels\/([^/]+)/);
@@ -118,6 +119,17 @@
     return null;
   }
 
+  function safeLink(value) {
+    return /^https:\/\/launchpad\.incubics\.com\/[^/]+\/channels\/[^/?#]+$/.test(String(value || "")) ? String(value) : "";
+  }
+
+  function channelLink(team, channel) {
+    var teamName = team && team.name ? String(team.name) : "";
+    var channelName = channel && channel.name ? String(channel.name) : "";
+    if (!teamName || !channelName) return "";
+    return safeLink("https://launchpad.incubics.com/" + encodeURIComponent(teamName) + "/channels/" + encodeURIComponent(channelName));
+  }
+
   function recurrenceLabel(value) {
     return {
       none: "Does not repeat",
@@ -171,7 +183,8 @@
       title: String(raw.title),
       startAt: Number(raw.startAt),
       durationMin: Number(raw.durationMin) || 30,
-      recurrence: raw.recurrence || "none"
+      recurrence: raw.recurrence || "none",
+      link: safeLink(raw.link)
     };
   }
 
@@ -210,7 +223,7 @@
 
   function formMarkup() {
     return '<h2>Schedule a meeting</h2>' +
-      '<p class="incubics-meeting-dialog-lead">Choose a one-time meeting or a repeat. Everyone in this channel receives a calendar invite.</p>' +
+      '<p class="incubics-meeting-dialog-lead">Choose a one-time meeting or a repeat. Everyone in this channel receives a calendar invite with a link back to this channel.</p>' +
       '<label>Title<input name="title" type="text" maxlength="120" required placeholder="Sprint review"></label>' +
       '<label>Date<input name="date" type="date" required></label>' +
       '<label>Time<input name="time" type="time" required></label>' +
@@ -262,7 +275,7 @@
     if (!bar) {
       bar = document.createElement("div");
       bar.id = "incubics-schedule-bar";
-      bar.innerHTML = '<button type="button" id="incubics-schedule-meeting">Schedule meeting</button><span>One time, or repeat daily, on weekdays, weekly, or monthly. Everyone in this channel gets a calendar invite.</span>';
+      bar.innerHTML = '<button type="button" id="incubics-schedule-meeting">Schedule meeting</button><span>One time, or repeat daily, on weekdays, weekly, or monthly. Everyone in this channel gets a calendar invite with a link back to this channel.</span>';
       bar.querySelector("button").addEventListener("click", function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -323,9 +336,11 @@
     }
     list.innerHTML = rows.map(function (row) {
       var meeting = row.meeting;
+      var link = safeLink(meeting.link);
       return '<article class="incubics-meeting-card"><div><strong>' + escapeHtml(meeting.title) + '</strong><p>' +
         escapeHtml(formatWhen(row.when)) + " · " + meeting.durationMin + " min · " + escapeHtml(recurrenceLabel(meeting.recurrence)) +
-        '</p></div><button type="button" class="incubics-meeting-cancel" data-cancel="' + escapeHtml(meeting.postId) + '">Cancel</button></article>';
+        '</p>' + (link ? '<p><a href="' + escapeHtml(link) + '">' + escapeHtml(link) + '</a></p>' : '') +
+        '</div><button type="button" class="incubics-meeting-cancel" data-cancel="' + escapeHtml(meeting.postId) + '">Cancel</button></article>';
     }).join("");
   }
 
@@ -341,12 +356,14 @@
 
   function load(route) {
     var key = route.team + "/" + route.channel;
+    if (loading && loadedKey === key) return;
     if (loadedKey === key && current) {
       renderList();
       return;
     }
     loadedKey = key;
     var gen = ++loadGen;
+    loading = true;
     setNote("Loading meetings…");
     api("/api/v4/teams/name/" + encodeURIComponent(route.team)).then(function (team) {
       return api("/api/v4/teams/" + team.id + "/channels/name/" + encodeURIComponent(route.channel)).then(function (channel) {
@@ -357,12 +374,14 @@
         ]);
       });
     }).then(function (result) {
+      if (gen === loadGen) loading = false;
       if (gen !== loadGen || !current || current.key !== key) return;
       var pinned = Array.isArray(result[0]) ? result[0] : [];
       var recent = result[1] && result[1].posts ? Object.keys(result[1].posts).map(function (id) { return result[1].posts[id]; }) : [];
       collect(pinned.concat(recent));
       setNote("");
     }).catch(function () {
+      if (gen === loadGen) loading = false;
       if (loadedKey !== key) return;
       setNote("Meetings could not be loaded.");
     });
@@ -397,7 +416,9 @@
     return "";
   }
 
-  function buildIcs(meeting, uid) {
+  function buildIcs(meeting, uid, link) {
+    var description = recurrenceLabel(meeting.recurrence) + ". Scheduled in this channel.";
+    if (link) description += "\nJoin: " + link;
     var lines = [
       "BEGIN:VCALENDAR",
       "PRODID:-//Incubics//Launchpad//EN",
@@ -410,8 +431,9 @@
       "DTSTART:" + icsStamp(meeting.startAt),
       "DTEND:" + icsStamp(meeting.startAt + meeting.durationMin * 60000),
       "SUMMARY:" + icsEscape(meeting.title),
-      "DESCRIPTION:" + icsEscape(recurrenceLabel(meeting.recurrence) + ". Scheduled in this channel.")
+      "DESCRIPTION:" + icsEscape(description)
     ];
+    if (link) lines.push("URL:" + icsEscape(link));
     var rule = rrule(meeting.recurrence);
     if (rule) lines.push("RRULE:" + rule);
     lines.push("END:VEVENT", "END:VCALENDAR");
@@ -463,12 +485,15 @@
       durationMin: Number(form.get("duration")) || 30,
       recurrence: String(form.get("recurrence") || "none")
     };
-    var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence) + "\nA calendar invite is being emailed to this channel.";
     loadGen += 1;
     setDialogNote("Sending the calendar invite…");
     ensureChannel().then(function (context) {
+      meeting.link = channelLink(context.team, context.channel);
+      var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence);
+      if (meeting.link) message += "\nJoin: " + meeting.link;
+      message += "\nA calendar invite is being emailed to this channel.";
       var filename = meeting.title.replace(/[^\w.-]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "meeting";
-      return uploadIcs(context.channel.id, filename + ".ics", buildIcs(meeting, "incubics-" + Date.now() + "@launchpad.incubics.com")).catch(function () {
+      return uploadIcs(context.channel.id, filename + ".ics", buildIcs(meeting, "incubics-" + Date.now() + "@launchpad.incubics.com", meeting.link)).catch(function () {
         return "";
       }).then(function (fileId) {
         var body = {channel_id: context.channel.id, message: message, props: {incubics_meeting: meeting}};

@@ -1,5 +1,5 @@
 (function () {
-  var version = "15";
+  var version = "17";
 
   function loadStyle(href) {
     if (document.querySelector('link[href="' + href + '"]')) return;
@@ -37,11 +37,11 @@
         );
       }
       loadStyle("/brand/meetings.css?v=" + version);
-      loadStyle("/brand/kanban.css?v=15");
-      loadStyle("/brand/files.css?v=1");
+      loadStyle("/brand/kanban.css?v=16");
+      loadStyle("/brand/files.css?v=3");
       Promise.all([
-        loadScript("/brand/kanban.js?v=15"),
-        loadScript("/brand/files.js?v=1"),
+        loadScript("/brand/kanban.js?v=16"),
+        loadScript("/brand/files.js?v=3"),
         loadScript("/brand/meetings.js?v=" + version)
       ]).then(addButton);
     }

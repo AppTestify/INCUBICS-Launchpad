@@ -458,6 +458,7 @@
       '<label>Details<textarea name="details" rows="8" maxlength="4000" placeholder="Add the ticket details"></textarea></label>' +
       '<div class="incubics-ticket-actions"><button type="submit">Save ticket</button>' +
       (postId ? '<button type="button" data-chat>Open in chat</button>' : "") +
+      (card ? '<button type="button" data-delete>Delete ticket</button>' : "") +
       '</div><p class="incubics-ticket-note" hidden></p></form>';
     var form = board.querySelector("form");
     var currentStatus = card ? cardValue(card, state.groupById) : (optionId || (columns[0] && columns[0].id) || "");
@@ -470,12 +471,52 @@
     form.querySelector("[data-back]").addEventListener("click", function () { render(state); });
     var chat = form.querySelector("[data-chat]");
     if (chat) chat.addEventListener("click", function () { openInChat(postId); });
+    var remove = form.querySelector("[data-delete]");
+    if (remove) remove.addEventListener("click", function () { deleteTicket(form, card); });
     form.addEventListener("submit", function (event) {
       event.preventDefault();
       saveTicket(form, card);
     });
     pane.dataset.ticket = "1";
     form.elements.title.focus();
+  }
+
+  function deleteTicket(form, card) {
+    if (!card || !state || !state.board) return;
+    if (!window.confirm("Delete this ticket?")) return;
+    var note = form.querySelector(".incubics-ticket-note");
+    var buttons = form.querySelectorAll("button");
+    note.hidden = false;
+    note.textContent = "Deleting…";
+    for (var i = 0; i < buttons.length; i++) buttons[i].disabled = true;
+    var path = "/plugins/focalboard/api/v2/boards/" + state.board.id + "/blocks/" + card.id;
+    function request(method, body) {
+      var headers = {"Accept": "application/json", "X-Requested-With": "XMLHttpRequest"};
+      var token = csrf();
+      if (token) headers["X-CSRF-Token"] = token;
+      if (body) headers["Content-Type"] = "application/json";
+      return fetch(path, {
+        method: method,
+        credentials: "same-origin",
+        headers: headers,
+        body: body ? JSON.stringify(body) : undefined
+      }).then(function (response) {
+        if (!response.ok) throw new Error(String(response.status));
+      });
+    }
+    request("DELETE").catch(function () {
+      return request("PATCH", {updatedFields: {deleteAt: Date.now()}, deletedFields: []});
+    }).then(function () {
+      var removed = Date.now();
+      (state.blocks || []).forEach(function (block) {
+        if (block.id === card.id || block.parentId === card.id) block.deleteAt = removed;
+      });
+      render(state);
+      decoratePosts();
+    }).catch(function () {
+      for (var j = 0; j < buttons.length; j++) buttons[j].disabled = false;
+      note.textContent = "The ticket could not be deleted.";
+    });
   }
 
   function saveTicket(form, card) {
