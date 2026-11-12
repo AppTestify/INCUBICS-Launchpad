@@ -302,6 +302,22 @@
   function closeCard() {
     var dialog = document.getElementById("incubics-card-dialog");
     if (dialog) dialog.remove();
+    var pane = document.getElementById("incubics-kanban-pane");
+    if (pane) pane.dataset.ticket = "";
+  }
+
+  function findBlock(id) {
+    var found = null;
+    (state.blocks || []).forEach(function (block) { if (block.id === id) found = block; });
+    return found;
+  }
+
+  function textBlockFor(card) {
+    var found = null;
+    (state.blocks || []).forEach(function (block) {
+      if (!found && block && !block.deleteAt && block.parentId === card.id && block.type === "text") found = block;
+    });
+    return found;
   }
 
   function cardText(card) {
@@ -313,6 +329,91 @@
       if (content) parts.push(String(content));
     });
     return parts.join("\n\n").trim();
+  }
+
+  function ticketProperties(card, optionId, assignee, deadline) {
+    var properties = Object.assign({}, card && card.fields ? card.fields.properties : {});
+    if (state.groupById) {
+      if (optionId) properties[state.groupById] = optionId;
+      else delete properties[state.groupById];
+    }
+    var person = personProp(state);
+    var due = dateProp(state);
+    if (person) {
+      if (assignee) properties[person.id] = assignee;
+      else delete properties[person.id];
+    }
+    if (due) {
+      if (deadline) properties[due.id] = JSON.stringify({from: deadline});
+      else delete properties[due.id];
+    }
+    return properties;
+  }
+
+  function writeDetails(card, details) {
+    var existing = textBlockFor(card);
+    if (!details && !existing) return Promise.resolve(card);
+    if (existing) {
+      existing.fields = Object.assign({}, existing.fields, {content: details});
+      return api("/plugins/focalboard/api/v2/boards/" + state.board.id + "/blocks/" + existing.id, {
+        method: "PATCH",
+        body: {updatedFields: {fields: existing.fields, content: details}, deletedFields: []}
+      }).then(function () { return card; });
+    }
+    var now = Date.now();
+    var text = {
+      id: "t" + uid().slice(1),
+      schema: 1,
+      boardId: state.board.id,
+      parentId: card.id,
+      type: "text",
+      title: "",
+      createAt: now,
+      updateAt: now,
+      fields: {content: details}
+    };
+    return api("/plugins/focalboard/api/v2/boards/" + state.board.id + "/blocks", {
+      method: "POST",
+      body: [text]
+    }).then(function (created) {
+      var saved = Array.isArray(created) && created[0] ? created[0] : text;
+      if (!saved.fields) saved.fields = text.fields;
+      state.blocks.push(saved);
+      var order = [[saved.id]];
+      card.fields = Object.assign({}, card.fields, {contentOrder: order});
+      return api("/plugins/focalboard/api/v2/boards/" + state.board.id + "/blocks/" + card.id, {
+        method: "PATCH",
+        body: {updatedFields: {fields: card.fields, contentOrder: order}, deletedFields: []}
+      }).then(function () { return card; });
+    });
+  }
+
+  function rememberCard(card, title, properties, assignee, deadline) {
+    card.title = title;
+    card.fields = Object.assign({}, card.fields, {
+      properties: properties,
+      assigneeId: assignee,
+      deadline: deadline || 0
+    });
+    return card;
+  }
+
+  function patchCard(card, title, properties, assignee, deadline) {
+    rememberCard(card, title, properties, assignee, deadline);
+    return api("/plugins/focalboard/api/v2/boards/" + state.board.id + "/blocks/" + card.id, {
+      method: "PATCH",
+      body: {
+        updatedFields: {
+          title: title,
+          fields: card.fields,
+          properties: properties,
+          postId: card.fields.postId || "",
+          assigneeId: assignee,
+          deadline: deadline || 0
+        },
+        deletedFields: []
+      }
+    });
   }
 
   function openInChat(postId) {
@@ -330,36 +431,102 @@
     if (route) history.pushState({}, "", "/" + encodeURIComponent(route.team) + "/pl/" + postId);
   }
 
-  function openCard(cardId) {
+  function openTicket(card, optionId) {
     if (!state || state.empty) return;
-    var card = null;
-    (state.blocks || []).forEach(function (block) { if (block.id === cardId) card = block; });
-    if (!card) return;
-    closeCard();
     closeAssign();
-    var label = badge(state, card);
-    var who = assignmentLabel(card);
-    var body = cardText(card);
-    var postId = card.fields && card.fields.postId;
-    var teamId = state.team && state.team.id;
-    var viewId = state.view && state.view.id;
-    var boardPath = teamId ? "/boards/team/" + teamId + "/" + state.board.id + (viewId ? "/" + viewId : "") + "/" + card.id : "";
-    var dialog = document.createElement("div");
-    dialog.id = "incubics-card-dialog";
-    dialog.innerHTML = '<div class="incubics-card-panel" role="dialog" aria-label="Card">' +
-      "<h2>" + escapeHtml(card.title || "Untitled") + "</h2>" +
-      (label ? '<p class="incubics-card-status">' + escapeHtml(label.name) + "</p>" : "") +
-      "<p>" + escapeHtml(who || "Unassigned") + "</p>" +
-      (body ? '<p class="incubics-card-body">' + escapeHtml(body) + "</p>" : "") +
-      '<div class="incubics-card-actions">' +
-      (postId ? '<button type="button" data-chat>Open in chat</button>' : "") +
-      (boardPath ? '<a href="' + escapeHtml(boardPath) + '">Open in Boards</a>' : "") +
-      '<button type="button" data-close>Close</button></div></div>';
-    dialog.addEventListener("click", function (event) {
-      if (event.target === dialog || event.target.hasAttribute("data-close")) closeCard();
-      if (event.target.hasAttribute("data-chat")) openInChat(postId);
+    var pane = ensurePane();
+    var board = pane.querySelector(".incubics-kanban-board");
+    var columns = columnsOf(state);
+    var statusOptions = columns.map(function (column) {
+      return '<option value="' + escapeHtml(column.id) + '">' + escapeHtml(column.name) + "</option>";
+    }).join("");
+    var people = (state.members || []).slice().sort(function (a, b) {
+      return memberName(a).localeCompare(memberName(b));
     });
-    document.body.appendChild(dialog);
+    var personOptions = '<option value="">Unassigned</option>' + people.map(function (user) {
+      return '<option value="' + escapeHtml(user.id) + '">' + escapeHtml(memberName(user)) + "</option>";
+    }).join("");
+    var postId = card && card.fields && card.fields.postId;
+    board.classList.add("is-ticket");
+    board.innerHTML = '<form class="incubics-ticket-page">' +
+      '<button type="button" data-back>Back to board</button>' +
+      "<h2>" + (card ? "Ticket" : "New ticket") + "</h2>" +
+      '<label>Title<input name="title" maxlength="200" required></label>' +
+      '<label>Status<select name="status">' + statusOptions + "</select></label>" +
+      '<label>Assign to<select name="assignee">' + personOptions + "</select></label>" +
+      '<label>Deadline<input name="deadline" type="date"></label>' +
+      '<label>Details<textarea name="details" rows="8" maxlength="4000" placeholder="Add the ticket details"></textarea></label>' +
+      '<div class="incubics-ticket-actions"><button type="submit">Save ticket</button>' +
+      (postId ? '<button type="button" data-chat>Open in chat</button>' : "") +
+      '</div><p class="incubics-ticket-note" hidden></p></form>';
+    var form = board.querySelector("form");
+    var currentStatus = card ? cardValue(card, state.groupById) : (optionId || (columns[0] && columns[0].id) || "");
+    form.elements.title.value = card ? (card.title || "") : "";
+    if (currentStatus) form.elements.status.value = currentStatus;
+    form.elements.assignee.value = card ? (cardAssignee(card) || "") : "";
+    var due = card ? cardDeadline(card) : null;
+    if (due) form.elements.deadline.value = dateInputValue(due);
+    form.elements.details.value = card ? cardText(card) : "";
+    form.querySelector("[data-back]").addEventListener("click", function () { render(state); });
+    var chat = form.querySelector("[data-chat]");
+    if (chat) chat.addEventListener("click", function () { openInChat(postId); });
+    form.addEventListener("submit", function (event) {
+      event.preventDefault();
+      saveTicket(form, card);
+    });
+    pane.dataset.ticket = "1";
+    form.elements.title.focus();
+  }
+
+  function saveTicket(form, card) {
+    var title = String(form.elements.title.value || "").trim();
+    if (!title) return;
+    var note = form.querySelector(".incubics-ticket-note");
+    var submit = form.querySelector("[type='submit']");
+    note.hidden = false;
+    note.textContent = "Saving…";
+    submit.disabled = true;
+    var optionId = form.elements.status.value;
+    var assignee = form.elements.assignee.value;
+    var deadline = dateInputToMs(form.elements.deadline.value);
+    var details = String(form.elements.details.value || "").trim();
+    var properties = ticketProperties(card, optionId, assignee, deadline);
+    var pending = card
+      ? patchCard(card, title, properties, assignee, deadline).then(function () { return card; })
+      : createTicket(title, properties, assignee, deadline);
+    pending.then(function (saved) {
+      return writeDetails(saved, details).then(function () { return saved; });
+    }).then(function () {
+      render(state);
+    }).catch(function () {
+      submit.disabled = false;
+      note.textContent = "The ticket could not be saved.";
+    });
+  }
+
+  function createTicket(title, properties, assignee, deadline) {
+    var now = Date.now();
+    var block = {
+      id: "c" + uid().slice(1),
+      schema: 1,
+      boardId: state.board.id,
+      parentId: state.board.id,
+      type: "card",
+      title: title,
+      createAt: now,
+      updateAt: now,
+      fields: {properties: properties, contentOrder: [], icon: "", assigneeId: assignee, deadline: deadline || 0}
+    };
+    return api("/plugins/focalboard/api/v2/boards/" + state.board.id + "/blocks", {
+      method: "POST",
+      body: [block]
+    }).then(function (created) {
+      var saved = Array.isArray(created) && created[0] ? created[0] : block;
+      if (!saved.fields) saved.fields = block.fields;
+      saved.title = saved.title || title;
+      state.blocks.push(saved);
+      return saved;
+    });
   }
 
   function openAssign(options) {
@@ -557,51 +724,13 @@
       if (cardEl) {
         if (pane.dataset.dragging === "1") return;
         event.preventDefault();
-        openCard(cardEl.getAttribute("data-card"));
+        openTicket(findBlock(cardEl.getAttribute("data-card")));
         return;
       }
       var add = event.target.closest(".incubics-kanban-add");
       if (!add) return;
       var column = add.closest(".incubics-kanban-column");
-      var existing = column.querySelector(".incubics-kanban-compose");
-      if (existing) { existing.querySelector("input").focus(); return; }
-      var people = ((state && state.members) || []).slice().sort(function (a, b) {
-        return memberName(a).localeCompare(memberName(b));
-      });
-      var personOptions = '<option value="">Unassigned</option>' + people.map(function (user) {
-        return '<option value="' + escapeHtml(user.id) + '">' + escapeHtml(memberName(user)) + "</option>";
-      }).join("");
-      var form = document.createElement("form");
-      form.className = "incubics-kanban-compose";
-      form.innerHTML = '<input type="text" maxlength="200" placeholder="Card title" aria-label="Card title">' +
-        '<select aria-label="Assign to">' + personOptions + "</select>" +
-        '<input type="date" aria-label="Deadline">' +
-        '<div><button type="submit">Add</button><button type="button" data-cancel>Cancel</button></div>';
-      add.insertAdjacentElement("beforebegin", form);
-      var input = form.querySelector("input[type='text']");
-      input.focus();
-      form.addEventListener("click", function (click) {
-        if (click.target.hasAttribute("data-cancel")) form.remove();
-      });
-      form.addEventListener("submit", function (submit) {
-        submit.preventDefault();
-        var title = input.value.trim();
-        if (!title) return;
-        var assignee = form.querySelector("select").value;
-        var deadline = dateInputToMs(form.querySelector("input[type='date']").value);
-        if (assignee && deadline) {
-          saveAssignment({
-            title: title,
-            assignee: assignee,
-            deadline: deadline,
-            postId: "",
-            optionId: column.getAttribute("data-option") || ""
-          });
-        } else {
-          createCard(title, column.getAttribute("data-option") || "");
-        }
-        form.remove();
-      });
+      openTicket(null, column ? column.getAttribute("data-option") || "" : "");
     });
     document.body.appendChild(pane);
     return pane;
@@ -631,7 +760,9 @@
 
   function render(data) {
     var pane = ensurePane();
+    pane.dataset.ticket = "";
     var board = pane.querySelector(".incubics-kanban-board");
+    board.classList.remove("is-ticket");
     var cards = cardsOf(data);
     var columns = columnsOf(data);
     var html = columns.map(function (column) {
@@ -744,6 +875,10 @@
     if (state.empty) {
       setStatus(state.error ? "The kanban could not be opened." : "This channel does not have a kanban yet.");
       pane.querySelector(".incubics-kanban-board").innerHTML = "";
+      return;
+    }
+    if (pane.dataset.ticket === "1") {
+      place(pane);
       return;
     }
     if (pane.dataset.ready === "1" && pane.dataset.key === state.key) {
