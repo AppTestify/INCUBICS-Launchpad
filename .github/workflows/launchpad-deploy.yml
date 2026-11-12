@@ -1,0 +1,127 @@
+name: LaunchPad deploy
+
+# Deploys LaunchPad-INCUBICS to the server over SSH. Started by hand only.
+#
+# Repository secrets (Settings > Secrets and variables > Actions):
+#   LAUNCHPAD_SSH_HOST      server address
+#   LAUNCHPAD_SSH_PASSWORD  root password            (or use LAUNCHPAD_SSH_KEY instead)
+#   LAUNCHPAD_SSH_KEY       private key for root     (optional, preferred over a password)
+#
+# mode "check" only reads the server's state. mode "install" copies launchpad/server to
+# /opt/launchpad and runs install.sh, which works inside its own compose project and does not
+# stop, restart or reconfigure anything else on the server.
+
+on:
+  workflow_dispatch:
+    inputs:
+      mode:
+        description: 'check = read-only report, install = install or update'
+        type: choice
+        options: [check, install]
+        default: check
+      install_docker:
+        description: 'Install Docker if the server has none (never upgrades an existing Docker)'
+        type: boolean
+        default: false
+
+permissions:
+  contents: read
+  packages: read
+
+concurrency:
+  group: launchpad-deploy
+  cancel-in-progress: false
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    timeout-minutes: 40
+    env:
+      SSH_HOST: ${{ secrets.LAUNCHPAD_SSH_HOST }}
+      SSHPASS: ${{ secrets.LAUNCHPAD_SSH_PASSWORD }}
+      SSH_KEY: ${{ secrets.LAUNCHPAD_SSH_KEY }}
+      MODE: ${{ inputs.mode }}
+      INSTALL_DOCKER: ${{ inputs.install_docker }}
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          sparse-checkout: launchpad
+
+      - name: Prepare SSH
+        run: |
+          [ -n "$SSH_HOST" ] || { echo "::error::Secret LAUNCHPAD_SSH_HOST is not set"; exit 1; }
+          mkdir -p ~/.ssh && chmod 700 ~/.ssh
+          opts="-o StrictHostKeyChecking=accept-new -o ConnectTimeout=20 -o ServerAliveInterval=30"
+          if [ -n "$SSH_KEY" ]; then
+            printf '%s\n' "$SSH_KEY" > ~/.ssh/launchpad && chmod 600 ~/.ssh/launchpad
+            echo "SSH=ssh $opts -i $HOME/.ssh/launchpad root@$SSH_HOST" >> "$GITHUB_ENV"
+            echo "SCP=scp $opts -i $HOME/.ssh/launchpad" >> "$GITHUB_ENV"
+          elif [ -n "$SSHPASS" ]; then
+            sudo apt-get install -y -qq sshpass >/dev/null
+            echo "SSH=sshpass -e ssh $opts root@$SSH_HOST" >> "$GITHUB_ENV"
+            echo "SCP=sshpass -e scp $opts" >> "$GITHUB_ENV"
+          else
+            echo "::error::Set LAUNCHPAD_SSH_PASSWORD or LAUNCHPAD_SSH_KEY"; exit 1
+          fi
+
+      - name: Report server state (read-only)
+        run: |
+          $SSH 'bash -s' <<'REMOTE'
+          echo "== system =="; . /etc/os-release; echo "$PRETTY_NAME"; nproc; free -m | sed -n 2p; df -h / | tail -1
+          echo "== docker =="; docker --version 2>&1; docker compose version 2>&1
+          echo "== containers =="; docker ps --format 'table {{.Names}}\t{{.Image}}\t{{.Ports}}' 2>&1
+          echo "== ports 80/443 =="; ss -ltnp | grep -E ':(80|443)\s' || echo "free"
+          echo "== existing launchpad =="; ls -la /opt/launchpad 2>&1 | head -20
+          echo "== dns =="; getent hosts launchpad.incubics.com || echo "launchpad.incubics.com does not resolve"
+          echo "== public ip =="; curl -s -m 10 https://api.ipify.org || true; echo
+          REMOTE
+
+      - name: Install Docker when missing
+        if: inputs.mode == 'install'
+        run: |
+          $SSH "INSTALL_DOCKER=$INSTALL_DOCKER bash -s" <<'REMOTE'
+          set -e
+          if command -v docker >/dev/null && docker compose version >/dev/null 2>&1; then
+            echo "Docker is already installed; leaving it untouched."
+          elif [ "$INSTALL_DOCKER" = "true" ] && ! command -v docker >/dev/null; then
+            curl -fsSL https://get.docker.com | sh
+          else
+            echo "::error::Docker (with the compose plugin) is missing. Re-run with install_docker enabled."; exit 1
+          fi
+          REMOTE
+
+      - name: Copy the stack to /opt/launchpad
+        if: inputs.mode == 'install'
+        run: |
+          $SSH 'mkdir -p /opt/launchpad/nginx'
+          cd launchpad/server
+          $SCP compose.yml compose.edge.yml install.sh "root@$SSH_HOST:/opt/launchpad/"
+          $SCP nginx/routes.inc "root@$SSH_HOST:/opt/launchpad/nginx/"
+          $SSH 'chmod +x /opt/launchpad/install.sh'
+
+      - name: Install or update LaunchPad
+        if: inputs.mode == 'install'
+        env:
+          GHCR_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+          GHCR_USER: ${{ github.actor }}
+        run: |
+          printf '%s' "$GHCR_TOKEN" | $SSH "docker login ghcr.io -u '$GHCR_USER' --password-stdin"
+          status=0
+          $SSH 'cd /opt/launchpad && ./install.sh' || status=$?
+          $SSH 'docker logout ghcr.io' || true
+          exit $status
+
+      - name: Verify
+        if: inputs.mode == 'install'
+        run: |
+          $SSH 'bash -s' <<'REMOTE'
+          cd /opt/launchpad
+          sleep 60
+          docker compose ps --format 'table {{.Name}}\t{{.Status}}'
+          echo "== local response =="
+          bind=$(sed -n 's/^NGINX_HTTP_BIND=//p' .env); bind=${bind/0.0.0.0/127.0.0.1}
+          curl -s -o /dev/null -m 15 -w 'http %{http_code}\n' -H 'Host: launchpad.incubics.com' "http://$bind/" || true
+          curl -sI -m 15 -H 'Host: launchpad.incubics.com' "http://$bind/robots.txt" | grep -i x-robots-tag || true
+          echo "== public response =="
+          curl -s -o /dev/null -m 15 -w 'https %{http_code}\n' https://launchpad.incubics.com/ || true
+          REMOTE

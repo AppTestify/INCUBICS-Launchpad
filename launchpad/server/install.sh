@@ -144,7 +144,7 @@ if [ "$MODE" = edge ] && ! docker compose exec -T nginx test -f "/etc/letsencryp
   email_arg="--register-unsafely-without-email"
   [ -n "$LE_EMAIL" ] && email_arg="--email $LE_EMAIL"
   # shellcheck disable=SC2086
-  if docker compose run --no-deps --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
+  if docker compose run -T --no-deps --entrypoint certbot certbot certonly --webroot -w /var/www/certbot \
       -d "$DOMAIN" --agree-tos --non-interactive $email_arg; then
     write_tls_conf
     docker compose exec -T nginx nginx -t && docker compose exec -T nginx nginx -s reload
