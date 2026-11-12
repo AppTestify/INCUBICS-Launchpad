@@ -36,6 +36,8 @@ import Attachments from './components/Attachments.svelte'
 import AttachmentsPresenter from './components/AttachmentsPresenter.svelte'
 import AttachmentsTooltip from './components/AttachmentsTooltip.svelte'
 import FileBrowser from './components/FileBrowser.svelte'
+import AttachmentsGalleryView from './components/AttachmentsGalleryView.svelte'
+import AttachmentsListView from './components/AttachmentsListView.svelte'
 import Photos from './components/Photos.svelte'
 import AttachmentsUpdatedMessage from './components/activity/AttachmentsUpdatedMessage.svelte'
 import IconAttachment from './components/icons/Attachment.svelte'
@@ -65,6 +67,8 @@ export {
   AttachmentStyleBoxEditor,
   AttachmentStyledBox,
   Attachments,
+  AttachmentsGalleryView,
+  AttachmentsListView,
   AttachmentsPresenter,
   AttachmentsTooltip,
   FileBrowser,

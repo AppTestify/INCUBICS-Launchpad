@@ -22,13 +22,15 @@
     ModernButton,
     navigate,
     panelSeparators,
-    Separator
+    Separator,
+    TabList
   } from '@hcengineering/ui'
   import { DocNotifyContext } from '@hcengineering/notification'
   import { ActivityMessage } from '@hcengineering/activity'
   import { getClient } from '@hcengineering/presentation'
   import { Channel, ObjectChatPanel } from '@hcengineering/chunter'
   import view from '@hcengineering/view'
+  import attachment from '@hcengineering/attachment'
   import { messageInFocus } from '@hcengineering/activity-resources'
   import { Presence } from '@hcengineering/presence-resources'
 
@@ -37,6 +39,7 @@
   import DocAside from './chat/DocAside.svelte'
   import chunter from '../plugin'
   import ChannelAside from './chat/ChannelAside.svelte'
+  import ChannelFiles from './ChannelFiles.svelte'
   import { isThreadMessage } from '../utils'
 
   export let object: Doc
@@ -51,6 +54,7 @@
 
   let isThreadOpened = false
   let isAsideShown = false
+  let activeTab: 'messages' | 'files' = 'messages'
 
   locationStore.subscribe((newLocation) => {
     isThreadOpened = newLocation.path[4] != null
@@ -61,6 +65,9 @@
   $: isDocChat = !hierarchy.isDerived(object._class, chunter.class.ChunterSpace)
   $: withAside =
     !embedded && !isThreadOpened && !hierarchy.isDerived(object._class, chunter.class.DirectMessage) && !showJoinOverlay
+  // Messages / Files tabs are offered in channels and direct conversations, not in chats attached to other objects
+  $: withTabs = !embedded && !isDocChat && !showJoinOverlay
+  $: showFiles = withTabs && activeTab === 'files'
 
   function toChannel (object: Doc): Channel {
     return object as Channel
@@ -99,6 +106,7 @@
 
   $: if (prevObjectId !== object._id) {
     prevObjectId = object._id
+    activeTab = 'messages'
     objectChatPanel = hierarchy.classHierarchyMixin(object._class, chunter.mixin.ObjectChatPanel)
     isAsideShown = isAsideShown ?? objectChatPanel?.openByDefault === true
   }
@@ -123,10 +131,28 @@
     }}
   />
 
+  {#if withTabs}
+    <div class="channel-tabs">
+      <TabList
+        items={[
+          { id: 'messages', labelIntl: chunter.string.Messages },
+          { id: 'files', labelIntl: attachment.string.Files }
+        ]}
+        selected={activeTab}
+        kind={'plain'}
+        on:select={(result) => {
+          if (result.detail !== undefined) activeTab = result.detail.id === 'files' ? 'files' : 'messages'
+        }}
+      />
+    </div>
+  {/if}
+
   <div class="popupPanel-body" class:asideShown={withAside && isAsideShown}>
     <div class="popupPanel-body__main">
       {#key object._id}
-        {#if !readonly && shouldShowJoinOverlay(object)}
+        {#if showFiles}
+          <ChannelFiles space={toChannel(object)._id} />
+        {:else if !readonly && shouldShowJoinOverlay(object)}
           <div class="body h-full w-full clear-mins flex-center">
             <div class="joinOverlay">
               <div class="an-element__label header">
@@ -162,6 +188,14 @@
 </div>
 
 <style lang="scss">
+  .channel-tabs {
+    display: flex;
+    align-items: center;
+    flex-shrink: 0;
+    padding: 0.25rem 1rem;
+    border-bottom: 1px solid var(--theme-divider-color);
+  }
+
   .joinOverlay {
     display: flex;
     align-self: center;
