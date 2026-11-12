@@ -6,7 +6,7 @@ The host nginx site inserts `footer.css` and `footer.js` into the HTML and serve
 
 On `/landing`, the Incubics logo sits to the left of the Mattermost wordmark. The Mattermost name stays on the page.
 
-Inside a channel, `kanban.js` adds a Kanban tab next to Messages. The tab shows the Focalboard board linked to that channel, with its status columns, and cards can be added or moved between columns.
+Inside a channel, `kanban.js` adds a Kanban tab next to Messages. The tab shows the Focalboard board linked to that channel, with its status columns. A card opens when it is clicked, and cards can be added or moved between columns.
 
 Each message has an Assign action. Choosing a person and a deadline creates a card on that board, and the message shows who owns it and when it is due.
 

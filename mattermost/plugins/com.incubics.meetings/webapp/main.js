@@ -37,9 +37,9 @@
         );
       }
       loadStyle("/brand/meetings.css?v=" + version);
-      loadStyle("/brand/kanban.css?v=11");
+      loadStyle("/brand/kanban.css?v=12");
       Promise.all([
-        loadScript("/brand/kanban.js?v=11"),
+        loadScript("/brand/kanban.js?v=12"),
         loadScript("/brand/meetings.js?v=" + version)
       ]).then(addButton);
     }

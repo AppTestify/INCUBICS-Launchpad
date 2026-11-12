@@ -238,11 +238,87 @@ body.incubics-kanban-on #incubics-kanban-pane {
   font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
   font-size: 14px;
   line-height: 1.35;
-  cursor: grab;
+  cursor: pointer;
+}
+
+.incubics-kanban-card:hover {
+  border-color: #9ed9c2;
 }
 
 .incubics-kanban-card:active {
   cursor: grabbing;
+}
+
+#incubics-card-dialog {
+  position: fixed;
+  inset: 0;
+  z-index: 80;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  background: rgba(15, 23, 36, 0.35);
+}
+
+.incubics-card-panel {
+  box-sizing: border-box;
+  width: min(440px, calc(100vw - 32px));
+  max-height: calc(100vh - 48px);
+  overflow: auto;
+  padding: 20px;
+  background: #ffffff;
+  border-radius: 12px;
+  box-shadow: 0 16px 40px rgba(16, 24, 40, 0.18);
+  color: #1c2330;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+}
+
+.incubics-card-panel h2 {
+  margin: 0 0 8px;
+  font-size: 18px;
+}
+
+.incubics-card-panel p {
+  margin: 0 0 8px;
+  font-size: 14px;
+}
+
+.incubics-card-status {
+  color: #0f8f68;
+  font-size: 12px;
+  font-weight: 700;
+}
+
+.incubics-card-body {
+  white-space: pre-wrap;
+  line-height: 1.45;
+}
+
+.incubics-card-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  align-items: center;
+  margin-top: 16px;
+}
+
+.incubics-card-actions a,
+.incubics-card-actions button {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 12px;
+  background: #f2f4f7;
+  color: #1c2330;
+  font: inherit;
+  font-size: 13px;
+  font-weight: 700;
+  text-decoration: none;
+  cursor: pointer;
+}
+
+.incubics-card-actions a {
+  background: #0f8f68;
+  color: #ffffff;
 }
 
 .incubics-kanban-icon {

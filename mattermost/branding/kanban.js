@@ -299,6 +299,69 @@
     if (dialog) dialog.remove();
   }
 
+  function closeCard() {
+    var dialog = document.getElementById("incubics-card-dialog");
+    if (dialog) dialog.remove();
+  }
+
+  function cardText(card) {
+    var parts = [];
+    (state.blocks || []).forEach(function (block) {
+      if (!block || block.deleteAt || block.parentId !== card.id) return;
+      if (block.type !== "text" && block.type !== "comment") return;
+      var content = block.fields && block.fields.content;
+      if (content) parts.push(String(content));
+    });
+    return parts.join("\n\n").trim();
+  }
+
+  function openInChat(postId) {
+    closeCard();
+    mode = "messages";
+    hideKanban();
+    var bar = document.getElementById("incubics-channel-tabs");
+    if (bar) setActive(bar);
+    var post = document.getElementById("post_" + postId);
+    if (post) {
+      post.scrollIntoView({block: "center"});
+      return;
+    }
+    var route = channelRoute();
+    if (route) history.pushState({}, "", "/" + encodeURIComponent(route.team) + "/pl/" + postId);
+  }
+
+  function openCard(cardId) {
+    if (!state || state.empty) return;
+    var card = null;
+    (state.blocks || []).forEach(function (block) { if (block.id === cardId) card = block; });
+    if (!card) return;
+    closeCard();
+    closeAssign();
+    var label = badge(state, card);
+    var who = assignmentLabel(card);
+    var body = cardText(card);
+    var postId = card.fields && card.fields.postId;
+    var teamId = state.team && state.team.id;
+    var viewId = state.view && state.view.id;
+    var boardPath = teamId ? "/boards/team/" + teamId + "/" + state.board.id + (viewId ? "/" + viewId : "") + "/" + card.id : "";
+    var dialog = document.createElement("div");
+    dialog.id = "incubics-card-dialog";
+    dialog.innerHTML = '<div class="incubics-card-panel" role="dialog" aria-label="Card">' +
+      "<h2>" + escapeHtml(card.title || "Untitled") + "</h2>" +
+      (label ? '<p class="incubics-card-status">' + escapeHtml(label.name) + "</p>" : "") +
+      "<p>" + escapeHtml(who || "Unassigned") + "</p>" +
+      (body ? '<p class="incubics-card-body">' + escapeHtml(body) + "</p>" : "") +
+      '<div class="incubics-card-actions">' +
+      (postId ? '<button type="button" data-chat>Open in chat</button>' : "") +
+      (boardPath ? '<a href="' + escapeHtml(boardPath) + '">Open in Boards</a>' : "") +
+      '<button type="button" data-close>Close</button></div></div>';
+    dialog.addEventListener("click", function (event) {
+      if (event.target === dialog || event.target.hasAttribute("data-close")) closeCard();
+      if (event.target.hasAttribute("data-chat")) openInChat(postId);
+    });
+    document.body.appendChild(dialog);
+  }
+
   function openAssign(options) {
     if (!state || state.empty) return;
     closeAssign();
@@ -490,6 +553,13 @@
         if (found) openAssign({card: found, postId: found.fields && found.fields.postId, title: found.title});
         return;
       }
+      var cardEl = event.target.closest(".incubics-kanban-card");
+      if (cardEl) {
+        if (pane.dataset.dragging === "1") return;
+        event.preventDefault();
+        openCard(cardEl.getAttribute("data-card"));
+        return;
+      }
       var add = event.target.closest(".incubics-kanban-add");
       if (!add) return;
       var column = add.closest(".incubics-kanban-column");
@@ -589,8 +659,12 @@
           event.preventDefault();
           return;
         }
+        pane.dataset.dragging = "1";
         event.dataTransfer.setData("text/plain", event.currentTarget.getAttribute("data-card"));
         event.dataTransfer.effectAllowed = "move";
+      });
+      nodes[i].addEventListener("dragend", function () {
+        setTimeout(function () { pane.dataset.dragging = ""; }, 50);
       });
     }
     setStatus("");
@@ -653,6 +727,7 @@
   }
 
   function hideKanban() {
+    closeCard();
     document.body.classList.remove("incubics-kanban-on");
     var pane = document.getElementById("incubics-kanban-pane");
     if (pane) pane.remove();
