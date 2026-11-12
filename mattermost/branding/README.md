@@ -10,6 +10,8 @@ Inside a channel, `kanban.js` adds a Kanban tab next to Messages. The tab shows 
 
 Each message has an Assign action. Choosing a person and a deadline creates a card on that board, and the message shows who owns it and when it is due.
 
+`files.js` adds a Files tab beside Meetings. It lists the files shared in the channel and can upload more. Files are stored on the Launchpad server, up to 100 MB each.
+
 `meetings.js` adds a Schedule meeting bar directly under the channel header, and a Meetings tab beside Messages. A member can schedule a one-time meeting or a repeat of daily, weekdays, weekly, or monthly. The meeting is posted and pinned in the channel. Everyone in the channel with an email address receives a calendar invite. The desktop app also loads this bar from the `com.incubics.meetings` webapp plugin, so an open window picks it up without a cached copy of the page.
 
 | Icon | Link |

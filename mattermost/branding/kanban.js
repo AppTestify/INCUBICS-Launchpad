@@ -913,7 +913,7 @@
     if (!bar) {
       bar = document.createElement("div");
       bar.id = "incubics-channel-tabs";
-      bar.innerHTML = '<button type="button" data-tab="messages">Messages</button><button type="button" data-tab="kanban">Kanban</button><button type="button" data-tab="meetings">Meetings</button>';
+      bar.innerHTML = '<button type="button" data-tab="messages">Messages</button><button type="button" data-tab="kanban">Kanban</button><button type="button" data-tab="meetings">Meetings</button><button type="button" data-tab="files">Files</button>';
       bar.addEventListener("click", function (event) {
         var button = event.target.closest("button");
         if (!button) return;

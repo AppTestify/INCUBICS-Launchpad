@@ -1,0 +1,120 @@
+#incubics-files-pane {
+  display: none;
+  position: fixed;
+  z-index: 21;
+  box-sizing: border-box;
+  padding: 20px 24px;
+  overflow: auto;
+  background: #f4f5f7;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  color: #1c2330;
+}
+
+body.incubics-files-on #incubics-files-pane {
+  display: block;
+}
+
+.incubics-files-bar {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  margin-bottom: 16px;
+}
+
+.incubics-files-bar h2 {
+  margin: 0 0 4px;
+  font-size: 18px;
+}
+
+.incubics-files-bar p,
+.incubics-files-note,
+.incubics-files-empty {
+  margin: 0;
+  color: #5d6573;
+  font-size: 13px;
+}
+
+.incubics-files-note {
+  margin-bottom: 12px;
+}
+
+.incubics-files-upload {
+  flex: 0 0 auto;
+  display: inline-flex;
+  align-items: center;
+  padding: 8px 14px;
+  border-radius: 6px;
+  background: #0f8f68;
+  color: #ffffff;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.incubics-files-upload input {
+  display: none;
+}
+
+.incubics-files-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.incubics-files-row {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px 12px;
+  background: #ffffff;
+  border: 1px solid #e6ebf2;
+  border-radius: 8px;
+  color: inherit;
+  text-decoration: none;
+}
+
+.incubics-files-row:hover {
+  border-color: #9ed9c2;
+}
+
+.incubics-files-row img,
+.incubics-files-ext {
+  flex: 0 0 auto;
+  width: 40px;
+  height: 40px;
+  border-radius: 6px;
+  object-fit: cover;
+  background: #eef3fb;
+}
+
+.incubics-files-ext {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  color: #2458b5;
+  font-size: 11px;
+  font-weight: 700;
+  text-transform: uppercase;
+}
+
+.incubics-files-name {
+  flex: 1 1 auto;
+  min-width: 0;
+  font-size: 14px;
+  font-weight: 700;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.incubics-files-meta {
+  flex: 0 0 auto;
+  color: #5d6573;
+  font-size: 12px;
+}
+
+.incubics-files-empty {
+  padding: 32px 0;
+  text-align: center;
+}
