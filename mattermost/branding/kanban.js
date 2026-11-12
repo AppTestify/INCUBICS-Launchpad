@@ -1,5 +1,13 @@
 (function () {
-  if (window.top !== window.self) return;
+  function appFrame() {
+    if (window.top === window.self) return true;
+    try {
+      return window.top.location.host !== window.location.host;
+    } catch (error) {
+      return true;
+    }
+  }
+  if (!appFrame()) return;
   if (window.__incubicsKanban) return;
   window.__incubicsKanban = true;
 

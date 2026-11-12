@@ -1,5 +1,13 @@
 (function () {
-  if (window.top !== window.self) return;
+  function appFrame() {
+    if (window.top === window.self) return true;
+    try {
+      return window.top.location.host !== window.location.host;
+    } catch (error) {
+      return true;
+    }
+  }
+  if (!appFrame()) return;
   if (window.__incubicsMeetings) return;
   window.__incubicsMeetings = true;
 
@@ -536,6 +544,8 @@
     var pane = document.getElementById("incubics-meetings-pane");
     if (pane && document.body.classList.contains("incubics-meetings-on")) place(pane);
   });
+  window.IncubicsMeetings = {open: openDialog};
+
   var observer = new MutationObserver(queue);
   function start() {
     queue();
