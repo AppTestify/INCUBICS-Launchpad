@@ -707,7 +707,8 @@
         paint();
       });
     }
-    if (bar.previousElementSibling !== channelHeader) channelHeader.insertAdjacentElement("afterend", bar);
+    var anchor = document.getElementById("incubics-schedule-bar") || channelHeader;
+    if (bar.previousElementSibling !== anchor) anchor.insertAdjacentElement("afterend", bar);
     setActive(bar);
     ensureData(route).then(function () {
       var current = channelRoute();

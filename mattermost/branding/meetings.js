@@ -248,27 +248,25 @@
   }
 
   function ensureHeaderButton() {
-    var bar = document.querySelector("#channel-header") || document.querySelector(".channel-header");
-    if (!bar) return;
-    var icons = bar.querySelector(".channel-header__icons") || bar.querySelector(".channel-header__top") || bar;
-    var button = document.getElementById("incubics-schedule-meeting");
-    if (!button) {
-      button = document.createElement("button");
-      button.id = "incubics-schedule-meeting";
-      button.type = "button";
-      button.textContent = "Schedule meeting";
-      button.addEventListener("click", function (event) {
+    var header = document.querySelector("#channel-header") || document.querySelector(".channel-header");
+    if (!header) return;
+    var bar = document.getElementById("incubics-schedule-bar");
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "incubics-schedule-bar";
+      bar.innerHTML = '<button type="button" id="incubics-schedule-meeting">Schedule meeting</button><span>One time, or repeat daily, on weekdays, weekly, or monthly. Everyone in this channel gets a calendar invite.</span>';
+      bar.querySelector("button").addEventListener("click", function (event) {
         event.preventDefault();
         event.stopPropagation();
         openDialog();
       });
     }
-    if (button.parentElement !== icons) icons.appendChild(button);
+    if (header.nextElementSibling !== bar) header.insertAdjacentElement("afterend", bar);
   }
 
   function removeHeaderButton() {
-    var button = document.getElementById("incubics-schedule-meeting");
-    if (button) button.remove();
+    var bar = document.getElementById("incubics-schedule-bar");
+    if (bar) bar.remove();
   }
 
   function setNote(text) {

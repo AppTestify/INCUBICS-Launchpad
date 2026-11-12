@@ -125,18 +125,40 @@ body.incubics-meetings-on #incubics-meetings-pane {
   color: #c23934;
 }
 
+#incubics-schedule-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex: 0 0 auto;
+  box-sizing: border-box;
+  width: 100%;
+  margin: 0;
+  padding: 10px 16px;
+  background: #e7f7f0;
+  border-bottom: 1px solid #9ed9c2;
+  color: #143028;
+  font-family: "Open Sans", "Helvetica Neue", Helvetica, Arial, sans-serif;
+  z-index: 6;
+}
+
+#incubics-schedule-bar span {
+  font-size: 13px;
+  line-height: 1.4;
+}
+
 #incubics-schedule-meeting {
+  appearance: none;
   display: inline-flex;
   align-items: center;
   flex: 0 0 auto;
-  margin: 0 8px;
-  padding: 4px 10px;
+  margin: 0;
+  padding: 8px 14px;
   border: 0;
   border-radius: 4px;
-  background: var(--button-bg, #1c58d9);
-  color: var(--button-color, #ffffff);
+  background: #0f8f68;
+  color: #ffffff;
   font: inherit;
-  font-size: 12px;
+  font-size: 14px;
   font-weight: 700;
   line-height: 20px;
   cursor: pointer;
