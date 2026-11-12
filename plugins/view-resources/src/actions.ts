@@ -231,6 +231,12 @@ export function getContextActionsSync (
   return result
 }
 
+// LaunchPad-INCUBICS: Kanban cards (tracker issues) cannot be deleted by anyone, so the Delete
+// actions are hidden from menus and shortcuts. Referenced by id because this package cannot
+// depend on the tracker plugin.
+const undeletableClass = 'tracker:class:Issue' as Ref<Class<Doc>>
+const undeletableActions = ['view:action:Delete', 'tracker:action:DeleteIssue'] as Array<Ref<Action>>
+
 function getIgnoreActions (ignoreActions: Array<Ref<Action> | ActionIgnore>, doc: Doc): Array<Ref<Action>> {
   const ignore: Array<Ref<Action>> = []
   const h = getClient().getHierarchy()
@@ -261,6 +267,10 @@ export function filterActions (
   const clazz = hierarchy.getClass(doc._class)
   const ignoreActions = hierarchy.as(clazz, view.mixin.IgnoreActions)
   const ignore: Array<Ref<Action>> = getIgnoreActions(ignoreActions?.actions ?? [], doc)
+
+  if (hierarchy.hasClass(undeletableClass) && hierarchy.isDerived(doc._class, undeletableClass)) {
+    ignore.push(...undeletableActions)
+  }
 
   // Collect ignores from parent
   const ancestors = hierarchy.getAncestors(clazz._id)
