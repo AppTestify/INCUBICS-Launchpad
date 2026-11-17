@@ -178,7 +178,7 @@ def build_ics(meeting, organizer, attendees, uid, link):
     end = meeting["startAt"] + meeting["durationMin"] * 60000
     description = "Scheduled in a channel on Incubics Launchpad. " + recurrence_label(meeting["recurrence"])
     if link:
-        description += "\nJoin: " + link
+        description += "\nJoin meeting: " + link
     lines = [
         "BEGIN:VCALENDAR",
         "PRODID:-//Incubics//Launchpad//EN",
@@ -264,7 +264,7 @@ def send_messages(settings, meeting, organizer, attendees, uid, link):
         + str(meeting["durationMin"])
         + " min · "
         + recurrence_label(meeting["recurrence"])
-        + ("\n\nJoin: " + link if link else "")
+        + ("\n\nJoin meeting: " + link if link else "")
         + "\n\nOpen the attached invite to add it to your calendar."
     )
     host = settings.get("SMTPServer")

@@ -240,6 +240,20 @@
     for (var i = 0; i < posts.length; i++) {
       var post = posts[i];
       if (post.querySelector(".incubics-join-call")) continue;
+      var message = post.querySelector(".post-message");
+      var styled = false;
+      if (message) {
+        var anchors = message.querySelectorAll("a[href]");
+        for (var j = 0; j < anchors.length; j++) {
+          var href = anchors[j].getAttribute("href") || "";
+          if (/\/meet\/[a-z0-9]{12}(?:$|[?#])/.test(href)) {
+            anchors[j].classList.add("incubics-join-call");
+            anchors[j].textContent = "Join meeting";
+            styled = true;
+          }
+        }
+      }
+      if (styled) continue;
       var text = post.innerText || "";
       var meetLink = text.match(/https:\/\/launchpad\.incubics\.com\/meet\/[a-z0-9]{12}/);
       if (meetLink) {
@@ -559,7 +573,7 @@
 
   function buildIcs(meeting, uid, link) {
     var description = recurrenceLabel(meeting.recurrence) + ". Scheduled in this channel.";
-    if (link) description += "\nJoin: " + link;
+    if (link) description += "\nJoin meeting: " + link;
     var lines = [
       "BEGIN:VCALENDAR",
       "PRODID:-//Incubics//Launchpad//EN",
@@ -632,7 +646,7 @@
       meeting.joinToken = joinToken();
       meeting.link = "https://launchpad.incubics.com/meet/" + meeting.joinToken;
       var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence);
-      if (meeting.link) message += "\nJoin: " + meeting.link;
+      if (meeting.link) message += "\n[Join meeting](" + meeting.link + ")";
       message += "\nA calendar invite is being emailed to this channel.";
       var filename = meeting.title.replace(/[^\w.-]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "meeting";
       return uploadIcs(context.channel.id, filename + ".ics", buildIcs(meeting, "incubics-" + Date.now() + "@launchpad.incubics.com", meeting.link)).catch(function () {
