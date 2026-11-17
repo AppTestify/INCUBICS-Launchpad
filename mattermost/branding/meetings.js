@@ -157,6 +157,23 @@
     return {team: decodeURIComponent(match[1]), channel: decodeURIComponent(match[2])};
   }
 
+  function meetUrl(value) {
+    var match = String(value || "").match(/\/meet\/([a-z0-9]{12})(?:$|[?#])/);
+    return match ? "https://launchpad.incubics.com/meet/" + match[1] : "";
+  }
+
+  function leaveBlankMeetRoute() {
+    if (!/^\/meet\/[a-z0-9]{12}\/?$/.test(location.pathname)) {
+      try { sessionStorage.removeItem("incubicsMeetReload"); } catch (err) {}
+      return;
+    }
+    try {
+      if (sessionStorage.getItem("incubicsMeetReload") === location.pathname) return;
+      sessionStorage.setItem("incubicsMeetReload", location.pathname);
+    } catch (err) {}
+    window.location.reload();
+  }
+
   function callsButton() {
     return document.getElementById("calls-join-button");
   }
@@ -248,7 +265,6 @@
           var href = anchors[j].getAttribute("href") || "";
           if (/\/meet\/[a-z0-9]{12}(?:$|[?#])/.test(href)) {
             anchors[j].classList.add("incubics-join-call");
-            anchors[j].textContent = "Join meeting";
             styled = true;
           }
         }
@@ -690,6 +706,7 @@
   }
 
   function paint() {
+    leaveBlankMeetRoute();
     var route = channelRoute();
     if (!route) {
       removeHeaderButton();
@@ -733,6 +750,14 @@
     var join = event.target.closest("[data-join], a");
     if (!join) return;
     var link = join.getAttribute("data-join") || join.getAttribute("href") || "";
+    var meeting = meetUrl(link);
+    if (meeting) {
+      event.preventDefault();
+      event.stopPropagation();
+      if (event.stopImmediatePropagation) event.stopImmediatePropagation();
+      window.location.assign(meeting);
+      return;
+    }
     if (!channelFromLink(link)) return;
     if (join.tagName === "A" && link.indexOf("join=call") < 0 && !/Join:\s*https:\/\/launchpad\.incubics\.com\//.test((join.closest(".post") || {}).innerText || "")) return;
     event.preventDefault();

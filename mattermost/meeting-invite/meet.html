@@ -83,7 +83,9 @@
       pointer-events: none;
       cursor: default;
     }
-    footer { margin-top: 18px; color: #6b7c76; font-size: 12px; }
+    footer, .back { margin-top: 18px; color: #6b7c76; font-size: 12px; }
+    .back { margin-top: 8px; }
+    .back a { color: #0f8f68; }
   </style>
 </head>
 <body data-open="@@OPEN@@">
@@ -106,6 +108,7 @@
       </div>
     </form>
     <footer>The app opens when it is installed. Otherwise join in the browser.</footer>
+    <p class="back"><a href="https://launchpad.incubics.com/incubics">Back to Launchpad</a></p>
   </main>
   <script>
     var open = document.body.getAttribute("data-open") === "yes";
