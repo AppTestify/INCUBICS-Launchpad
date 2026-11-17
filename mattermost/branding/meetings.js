@@ -157,21 +157,15 @@
     return {team: decodeURIComponent(match[1]), channel: decodeURIComponent(match[2])};
   }
 
-  function meetUrl(value) {
+  function meetToken(value) {
     var match = String(value || "").match(/\/meet\/([a-z0-9]{12})(?:$|[?#])/);
-    return match ? "https://launchpad.incubics.com/meet/" + match[1] : "";
+    return match ? match[1] : "";
   }
 
-  function leaveBlankMeetRoute() {
-    if (!/^\/meet\/[a-z0-9]{12}\/?$/.test(location.pathname)) {
-      try { sessionStorage.removeItem("incubicsMeetReload"); } catch (err) {}
-      return;
-    }
-    try {
-      if (sessionStorage.getItem("incubicsMeetReload") === location.pathname) return;
-      sessionStorage.setItem("incubicsMeetReload", location.pathname);
-    } catch (err) {}
-    window.location.reload();
+  function meetingRoomPath(token) {
+    var here = channelRoute();
+    var team = here && here.team ? here.team : "incubics";
+    return "/" + encodeURIComponent(team) + "/channels/meet" + token;
   }
 
   function callsButton() {
@@ -662,7 +656,7 @@
       meeting.joinToken = joinToken();
       meeting.link = "https://launchpad.incubics.com/meet/" + meeting.joinToken;
       var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence);
-      if (meeting.link) message += "\n[Join meeting](" + meeting.link + ")";
+      if (meeting.link) message += "\n[Join meeting](https://launchpad.incubics.com" + meetingRoomPath(meeting.joinToken) + ")";
       message += "\nA calendar invite is being emailed to this channel.";
       var filename = meeting.title.replace(/[^\w.-]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "meeting";
       return uploadIcs(context.channel.id, filename + ".ics", buildIcs(meeting, "incubics-" + Date.now() + "@launchpad.incubics.com", meeting.link)).catch(function () {
@@ -706,7 +700,6 @@
   }
 
   function paint() {
-    leaveBlankMeetRoute();
     var route = channelRoute();
     if (!route) {
       removeHeaderButton();
@@ -750,12 +743,12 @@
     var join = event.target.closest("[data-join], a");
     if (!join) return;
     var link = join.getAttribute("data-join") || join.getAttribute("href") || "";
-    var meeting = meetUrl(link);
-    if (meeting) {
+    var token = meetToken(link);
+    if (token) {
       event.preventDefault();
       event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-      window.location.assign(meeting);
+      window.location.assign(meetingRoomPath(token));
       return;
     }
     if (!channelFromLink(link)) return;
