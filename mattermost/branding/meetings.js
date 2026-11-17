@@ -162,12 +162,6 @@
     return match ? match[1] : "";
   }
 
-  function meetingRoomPath(token) {
-    var here = channelRoute();
-    var team = here && here.team ? here.team : "incubics";
-    return "/" + encodeURIComponent(team) + "/channels/meet" + token;
-  }
-
   function callsButton() {
     return document.getElementById("calls-join-button");
   }
@@ -656,7 +650,10 @@
       meeting.joinToken = joinToken();
       meeting.link = "https://launchpad.incubics.com/meet/" + meeting.joinToken;
       var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence);
-      if (meeting.link) message += "\n[Join meeting](https://launchpad.incubics.com" + meetingRoomPath(meeting.joinToken) + ")";
+      var here = channelRoute();
+      var teamName = here && here.team ? here.team : "incubics";
+      var channelName = here && here.channel ? here.channel : "";
+      if (meeting.link && channelName) message += "\n[Join meeting](https://launchpad.incubics.com/" + encodeURIComponent(teamName) + "/channels/" + encodeURIComponent(channelName) + "?join=call)";
       message += "\nA calendar invite is being emailed to this channel.";
       var filename = meeting.title.replace(/[^\w.-]+/g, "-").replace(/^-|-$/g, "").slice(0, 40) || "meeting";
       return uploadIcs(context.channel.id, filename + ".ics", buildIcs(meeting, "incubics-" + Date.now() + "@launchpad.incubics.com", meeting.link)).catch(function () {
@@ -748,7 +745,7 @@
       event.preventDefault();
       event.stopPropagation();
       if (event.stopImmediatePropagation) event.stopImmediatePropagation();
-      window.location.assign(meetingRoomPath(token));
+      pressCallsButton();
       return;
     }
     if (!channelFromLink(link)) return;

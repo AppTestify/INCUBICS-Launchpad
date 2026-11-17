@@ -5,9 +5,8 @@
   }
 
   function rescue() {
-    var token = meetingToken();
-    if (!token) return;
-    location.replace("/incubics/channels/meet" + token);
+    if (!meetingToken()) return;
+    location.replace(location.pathname);
   }
 
   rescue();

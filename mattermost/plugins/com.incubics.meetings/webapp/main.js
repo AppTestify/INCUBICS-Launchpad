@@ -1,5 +1,5 @@
 (function () {
-  var version = "23";
+  var version = "24";
 
   function loadStyle(href) {
     if (document.querySelector('link[href="' + href + '"]')) return;

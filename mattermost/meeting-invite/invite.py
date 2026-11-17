@@ -490,36 +490,12 @@ def prepare_room(user_token, channel_id, meeting, join_token):
         if status != 200 or not isinstance(team, dict):
             raise RuntimeError("team")
         team_name = str(team.get("name") or "")
-        if not re.fullmatch(r"[a-z0-9_-]+", team_name):
-            raise RuntimeError("team-name")
-        channel_name = "meet" + join_token
-        created_status, created = mm(
-            "POST",
-            "/api/v4/channels",
-            user_token,
-            {
-                "team_id": team_id,
-                "name": channel_name,
-                "display_name": meeting["title"][:64],
-                "type": "P",
-                "purpose": "Incubics meeting",
-                "header": SITE_URL + "/meet/" + join_token,
-            },
-        )
-        if created_status not in (200, 201) or not isinstance(created, dict):
-            raise RuntimeError("channel")
-        status, ids = member_ids(user_token, channel_id)
-        if status == 200:
-            for user_id in ids:
-                mm(
-                    "POST",
-                    "/api/v4/channels/" + created["id"] + "/members",
-                    user_token,
-                    {"user_id": user_id},
-                )
+        channel_name = str(source.get("name") or "")
+        if not re.fullmatch(r"[a-z0-9_-]+", team_name) or not re.fullmatch(r"[a-z0-9_-]+", channel_name):
+            raise RuntimeError("channel-name")
         room = {
             "token": join_token,
-            "channelId": created["id"],
+            "channelId": source["id"],
             "channel": channel_name,
             "team": team_name,
             "title": meeting["title"],
@@ -764,7 +740,9 @@ def _sweep_locked(now):
             continue
         for guest in room.get("guests") or []:
             delete_external(guest.get("username"))
-        mmctl(["channel", "delete", room.get("team", "") + ":" + room.get("channel", ""), "--confirm"])
+        channel_name = str(room.get("channel") or "")
+        if re.fullmatch(r"meet[a-z0-9]{12}", channel_name):
+            mmctl(["channel", "delete", room.get("team", "") + ":" + channel_name, "--confirm"])
         rooms.pop(token, None)
     allowed = {}
     tokens = {}
