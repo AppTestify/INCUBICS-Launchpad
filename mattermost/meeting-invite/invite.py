@@ -136,7 +136,7 @@ def channel_link(token, channel_id):
     team_name = str(team.get("name") or "")
     if not re.fullmatch(r"[A-Za-z0-9_-]+", team_name) or not re.fullmatch(r"[A-Za-z0-9_-]+", channel_name):
         return ""
-    return SITE_URL + "/" + urllib.parse.quote(team_name, safe="") + "/channels/" + urllib.parse.quote(channel_name, safe="")
+    return SITE_URL + "/" + urllib.parse.quote(team_name, safe="") + "/channels/" + urllib.parse.quote(channel_name, safe="") + "?join=call"
 
 
 def unfold(text):

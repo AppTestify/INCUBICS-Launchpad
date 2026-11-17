@@ -14,6 +14,35 @@ body.incubics-meetings-on #incubics-meetings-pane {
   display: block;
 }
 
+#incubics-join-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  margin: 0;
+  padding: 10px 16px;
+  background: #e7f7f0;
+  color: #135c45;
+  font-size: 14px;
+}
+
+#incubics-join-bar button,
+.incubics-join-call {
+  appearance: none;
+  border: 0;
+  border-radius: 6px;
+  padding: 8px 14px;
+  background: #0f8f68;
+  color: #ffffff;
+  font: inherit;
+  font-size: 14px;
+  font-weight: 700;
+  cursor: pointer;
+}
+
+.post .incubics-join-call {
+  margin: 8px 0 0;
+}
+
 .incubics-meetings-bar {
   display: flex;
   align-items: center;

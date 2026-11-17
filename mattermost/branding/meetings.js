@@ -120,7 +120,9 @@
   }
 
   function safeLink(value) {
-    return /^https:\/\/launchpad\.incubics\.com\/[^/]+\/channels\/[^/?#]+$/.test(String(value || "")) ? String(value) : "";
+    var text = String(value || "").replace(/[?#].*$/, "");
+    if (!/^https:\/\/launchpad\.incubics\.com\/[^/]+\/channels\/[^/?#]+$/.test(text)) return "";
+    return text + "?join=call";
   }
 
   function channelLink(team, channel) {
@@ -128,6 +130,112 @@
     var channelName = channel && channel.name ? String(channel.name) : "";
     if (!teamName || !channelName) return "";
     return safeLink("https://launchpad.incubics.com/" + encodeURIComponent(teamName) + "/channels/" + encodeURIComponent(channelName));
+  }
+
+  function channelFromLink(value) {
+    var match = String(value || "").match(/^(?:https:\/\/launchpad\.incubics\.com)?\/([^/?#]+)\/channels\/([^/?#]+)/);
+    if (!match) return null;
+    return {team: decodeURIComponent(match[1]), channel: decodeURIComponent(match[2])};
+  }
+
+  function callsButton() {
+    return document.getElementById("calls-join-button");
+  }
+
+  function callIsLive() {
+    var button = callsButton();
+    if (!button) return false;
+    var label = (button.getAttribute("aria-label") || button.innerText || "").replace(/\s+/g, " ").trim().toLowerCase();
+    return label.indexOf("join") !== -1;
+  }
+
+  function pressCallsButton() {
+    var button = callsButton();
+    if (button) {
+      button.click();
+      return;
+    }
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      var again = callsButton();
+      if (again) {
+        clearInterval(timer);
+        again.click();
+      } else if (tries > 20) clearInterval(timer);
+    }, 300);
+  }
+
+  function openCall(link) {
+    var target = channelFromLink(link);
+    var here = channelRoute();
+    if (target && here && target.team === here.team && target.channel === here.channel) {
+      pressCallsButton();
+      return;
+    }
+    if (target) {
+      window.location.href = "/" + encodeURIComponent(target.team) + "/channels/" + encodeURIComponent(target.channel) + "?join=call";
+    }
+  }
+
+  function joinFromLocation() {
+    if (!/[?&]join=call(?:&|$)/.test(window.location.search)) return;
+    if (window.__incubicsJoinStarted) return;
+    window.__incubicsJoinStarted = true;
+    var tries = 0;
+    var timer = setInterval(function () {
+      tries += 1;
+      var button = callsButton();
+      if (button) {
+        clearInterval(timer);
+        button.click();
+        try { history.replaceState({}, "", window.location.pathname); } catch (err) {}
+      } else if (tries > 25) clearInterval(timer);
+    }, 300);
+  }
+
+  function ensureJoinBar() {
+    var schedule = document.getElementById("incubics-schedule-bar");
+    var live = callIsLive();
+    var bar = document.getElementById("incubics-join-bar");
+    if (!live) {
+      if (bar) bar.remove();
+      return;
+    }
+    if (!bar) {
+      bar = document.createElement("div");
+      bar.id = "incubics-join-bar";
+      bar.innerHTML = "<strong>A call is in progress</strong><button type=\"button\">Join call</button>";
+      bar.querySelector("button").addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        pressCallsButton();
+      });
+    }
+    var anchor = schedule || document.querySelector("#channel-header") || document.querySelector(".channel-header");
+    if (anchor && bar.previousElementSibling !== anchor) anchor.insertAdjacentElement("afterend", bar);
+  }
+
+  function decorateMeetingPosts() {
+    var posts = document.querySelectorAll("#channel_view .post, .channel-view .post");
+    for (var i = 0; i < posts.length; i++) {
+      var post = posts[i];
+      if (post.querySelector(".incubics-join-call")) continue;
+      var text = post.innerText || "";
+      if (!/Join:\s*https:\/\/launchpad\.incubics\.com\/[^/]+\/channels\//.test(text)) continue;
+      var message = post.querySelector(".post-message");
+      if (!message) continue;
+      var button = document.createElement("button");
+      button.type = "button";
+      button.className = "incubics-join-call";
+      button.textContent = "Join call";
+      button.addEventListener("click", function (event) {
+        event.preventDefault();
+        event.stopPropagation();
+        pressCallsButton();
+      });
+      message.insertAdjacentElement("afterend", button);
+    }
   }
 
   function recurrenceLabel(value) {
@@ -339,7 +447,7 @@
       var link = safeLink(meeting.link);
       return '<article class="incubics-meeting-card"><div><strong>' + escapeHtml(meeting.title) + '</strong><p>' +
         escapeHtml(formatWhen(row.when)) + " · " + meeting.durationMin + " min · " + escapeHtml(recurrenceLabel(meeting.recurrence)) +
-        '</p>' + (link ? '<p><a href="' + escapeHtml(link) + '">' + escapeHtml(link) + '</a></p>' : '') +
+        '</p>' + (link ? '<p><button type="button" class="incubics-join-call" data-join="' + escapeHtml(link) + '">Join call</button></p>' : '') +
         '</div><button type="button" class="incubics-meeting-cancel" data-cancel="' + escapeHtml(meeting.postId) + '">Cancel</button></article>';
     }).join("");
   }
@@ -541,6 +649,9 @@
       return;
     }
     ensureHeaderButton();
+    decorateMeetingPosts();
+    ensureJoinBar();
+    joinFromLocation();
     if (!meetingsActive()) {
       if (document.body.classList.contains("incubics-meetings-on")) {
         document.body.classList.remove("incubics-meetings-on");
@@ -569,7 +680,17 @@
     var pane = document.getElementById("incubics-meetings-pane");
     if (pane && document.body.classList.contains("incubics-meetings-on")) place(pane);
   });
-  window.IncubicsMeetings = {open: openDialog};
+  window.IncubicsMeetings = {open: openDialog, join: pressCallsButton};
+  document.addEventListener("click", function (event) {
+    var join = event.target.closest("[data-join], a");
+    if (!join) return;
+    var link = join.getAttribute("data-join") || join.getAttribute("href") || "";
+    if (!channelFromLink(link)) return;
+    if (join.tagName === "A" && link.indexOf("join=call") < 0 && !/Join:\s*https:\/\/launchpad\.incubics\.com\//.test((join.closest(".post") || {}).innerText || "")) return;
+    event.preventDefault();
+    event.stopPropagation();
+    openCall(link.indexOf("join=call") >= 0 || join.hasAttribute("data-join") ? link : link + "?join=call");
+  }, true);
 
   var observer = new MutationObserver(queue);
   function start() {
