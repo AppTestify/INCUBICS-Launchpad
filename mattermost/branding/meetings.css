@@ -39,6 +39,11 @@ body.incubics-meetings-on #incubics-meetings-pane {
   cursor: pointer;
 }
 
+a.incubics-join-call {
+  display: inline-block;
+  text-decoration: none;
+}
+
 .post .incubics-join-call {
   margin: 8px 0 0;
 }
@@ -273,4 +278,27 @@ body.incubics-meetings-on #incubics-meetings-pane {
   .incubics-meetings-form {
     grid-template-columns: 1fr;
   }
+}
+
+html.incubics-meeting-guest #SidebarContainer,
+html.incubics-meeting-guest #sidebar-left,
+html.incubics-meeting-guest .sidebarHeaderContainer,
+html.incubics-meeting-guest #lhsNavigator,
+html.incubics-meeting-guest .globalHeader-leftControls,
+html.incubics-meeting-guest .GlobalSearchNav,
+html.incubics-meeting-guest .announcement-bar,
+html.incubics-meeting-guest .app-bar,
+html.incubics-meeting-guest #post-create,
+html.incubics-meeting-guest .post-create,
+html.incubics-meeting-guest .post-create__container,
+html.incubics-meeting-guest .channel-intro,
+html.incubics-meeting-guest .post-list__dynamic,
+html.incubics-meeting-guest .post-list-holder,
+html.incubics-meeting-guest #fileUploadOverlay,
+html.incubics-meeting-guest #sidebar-right,
+html.incubics-meeting-guest .modal-backdrop,
+html.incubics-meeting-guest .modal,
+html.incubics-meeting-guest [class*="NextSteps"],
+html.incubics-meeting-guest [class*="onboarding"] {
+  display: none !important;
 }

@@ -10,6 +10,9 @@
   if (!appFrame()) return;
   if (window.__incubicsMeetings) return;
   window.__incubicsMeetings = true;
+  if (/[?&]guest=1(?:&|$)/.test(window.location.search)) {
+    document.documentElement.classList.add("incubics-meeting-guest");
+  }
 
   var loadedKey = "";
   var meetings = [];
@@ -132,6 +135,22 @@
     return safeLink("https://launchpad.incubics.com/" + encodeURIComponent(teamName) + "/channels/" + encodeURIComponent(channelName));
   }
 
+  function joinToken() {
+    var alphabet = "abcdefghijklmnopqrstuvwxyz0123456789";
+    var bytes = new Uint8Array(12);
+    if (window.crypto && window.crypto.getRandomValues) window.crypto.getRandomValues(bytes);
+    else for (var i = 0; i < bytes.length; i++) bytes[i] = Math.floor(Math.random() * 256);
+    var token = "";
+    for (var n = 0; n < bytes.length; n++) token += alphabet[bytes[n] % alphabet.length];
+    return token;
+  }
+
+  function publicLink(value) {
+    var text = String(value || "").trim().replace(/[?#].*$/, "");
+    if (/^https:\/\/launchpad\.incubics\.com\/meet\/[a-z0-9]{12}$/.test(text)) return text;
+    return safeLink(text);
+  }
+
   function channelFromLink(value) {
     var match = String(value || "").match(/^(?:https:\/\/launchpad\.incubics\.com)?\/([^/?#]+)\/channels\/([^/?#]+)/);
     if (!match) return null;
@@ -162,8 +181,8 @@
       if (again) {
         clearInterval(timer);
         again.click();
-      } else if (tries > 20) clearInterval(timer);
-    }, 300);
+      } else if (tries > 60) clearInterval(timer);
+    }, 500);
   }
 
   function openCall(link) {
@@ -190,8 +209,8 @@
         clearInterval(timer);
         button.click();
         try { history.replaceState({}, "", window.location.pathname); } catch (err) {}
-      } else if (tries > 25) clearInterval(timer);
-    }, 300);
+      } else if (tries > 80) clearInterval(timer);
+    }, 500);
   }
 
   function ensureJoinBar() {
@@ -222,6 +241,16 @@
       var post = posts[i];
       if (post.querySelector(".incubics-join-call")) continue;
       var text = post.innerText || "";
+      var meetLink = text.match(/https:\/\/launchpad\.incubics\.com\/meet\/[a-z0-9]{12}/);
+      if (meetLink) {
+        var anchor = document.createElement("a");
+        anchor.className = "incubics-join-call";
+        anchor.href = meetLink[0];
+        anchor.textContent = "Join call";
+        var message = post.querySelector(".post-message");
+        if (message) message.insertAdjacentElement("afterend", anchor);
+        continue;
+      }
       if (!/Join:\s*https:\/\/launchpad\.incubics\.com\/[^/]+\/channels\//.test(text)) continue;
       var message = post.querySelector(".post-message");
       if (!message) continue;
@@ -292,7 +321,8 @@
       startAt: Number(raw.startAt),
       durationMin: Number(raw.durationMin) || 30,
       recurrence: raw.recurrence || "none",
-      link: safeLink(raw.link)
+      link: publicLink(raw.link),
+      joinToken: /^[a-z0-9]{12}$/.test(raw.joinToken || "") ? raw.joinToken : ""
     };
   }
 
@@ -331,7 +361,7 @@
 
   function formMarkup() {
     return '<h2>Schedule a meeting</h2>' +
-      '<p class="incubics-meeting-dialog-lead">Choose a one-time meeting or a repeat. Everyone in this channel receives a calendar invite with a link back to this channel.</p>' +
+      '<p class="incubics-meeting-dialog-lead">Choose a one-time meeting or a repeat. Everyone in this channel receives a calendar invite with a unique join link.</p>' +
       '<label>Title<input name="title" type="text" maxlength="120" required placeholder="Sprint review"></label>' +
       '<label>Date<input name="date" type="date" required></label>' +
       '<label>Time<input name="time" type="time" required></label>' +
@@ -383,7 +413,7 @@
     if (!bar) {
       bar = document.createElement("div");
       bar.id = "incubics-schedule-bar";
-      bar.innerHTML = '<button type="button" id="incubics-schedule-meeting">Schedule meeting</button><span>One time, or repeat daily, on weekdays, weekly, or monthly. Everyone in this channel gets a calendar invite with a link back to this channel.</span>';
+      bar.innerHTML = '<button type="button" id="incubics-schedule-meeting">Schedule meeting</button><span>One time, or repeat daily, on weekdays, weekly, or monthly. Everyone in this channel gets a calendar invite with a unique join link.</span>';
       bar.querySelector("button").addEventListener("click", function (event) {
         event.preventDefault();
         event.stopPropagation();
@@ -444,10 +474,13 @@
     }
     list.innerHTML = rows.map(function (row) {
       var meeting = row.meeting;
-      var link = safeLink(meeting.link);
+      var link = publicLink(meeting.link);
+      var join = "";
+      if (/\/meet\/[a-z0-9]{12}$/.test(link)) join = '<p><a class="incubics-join-call" href="' + escapeHtml(link) + '">Join call</a></p>';
+      else if (link) join = '<p><button type="button" class="incubics-join-call" data-join="' + escapeHtml(link) + '">Join call</button></p>';
       return '<article class="incubics-meeting-card"><div><strong>' + escapeHtml(meeting.title) + '</strong><p>' +
         escapeHtml(formatWhen(row.when)) + " · " + meeting.durationMin + " min · " + escapeHtml(recurrenceLabel(meeting.recurrence)) +
-        '</p>' + (link ? '<p><button type="button" class="incubics-join-call" data-join="' + escapeHtml(link) + '">Join call</button></p>' : '') +
+        '</p>' + join +
         '</div><button type="button" class="incubics-meeting-cancel" data-cancel="' + escapeHtml(meeting.postId) + '">Cancel</button></article>';
     }).join("");
   }
@@ -596,7 +629,8 @@
     loadGen += 1;
     setDialogNote("Sending the calendar invite…");
     ensureChannel().then(function (context) {
-      meeting.link = channelLink(context.team, context.channel);
+      meeting.joinToken = joinToken();
+      meeting.link = "https://launchpad.incubics.com/meet/" + meeting.joinToken;
       var message = "Meeting: " + meeting.title + "\n" + formatWhen(meeting.startAt) + " · " + meeting.durationMin + " min · " + recurrenceLabel(meeting.recurrence);
       if (meeting.link) message += "\nJoin: " + meeting.link;
       message += "\nA calendar invite is being emailed to this channel.";
@@ -692,8 +726,17 @@
     openCall(link.indexOf("join=call") >= 0 || join.hasAttribute("data-join") ? link : link + "?join=call");
   }, true);
 
+  function markGuest() {
+    api("/api/v4/users/me").then(function (me) {
+      if (me && /^meetg[a-z0-9]+$/.test(me.username || "")) {
+        document.documentElement.classList.add("incubics-meeting-guest");
+      }
+    }).catch(function () {});
+  }
+
   var observer = new MutationObserver(queue);
   function start() {
+    markGuest();
     queue();
     observer.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ["class"]});
   }
