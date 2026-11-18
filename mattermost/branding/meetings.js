@@ -237,7 +237,7 @@
       });
     }
     var anchor = schedule || document.querySelector("#channel-header") || document.querySelector(".channel-header");
-    if (anchor && bar.previousElementSibling !== anchor) anchor.insertAdjacentElement("afterend", bar);
+    if (anchor && bar.parentElement !== anchor.parentElement) anchor.insertAdjacentElement("afterend", bar);
   }
 
   function decorateMeetingPosts() {
@@ -438,7 +438,7 @@
         openDialog();
       });
     }
-    if (header.nextElementSibling !== bar) header.insertAdjacentElement("afterend", bar);
+    if (bar.parentElement !== header.parentElement) header.insertAdjacentElement("afterend", bar);
   }
 
   function removeHeaderButton() {
@@ -696,7 +696,18 @@
     });
   }
 
+  var painting = false;
   function paint() {
+    if (painting) return;
+    painting = true;
+    try {
+      paintNow();
+    } finally {
+      painting = false;
+    }
+  }
+
+  function paintNow() {
     var route = channelRoute();
     if (!route) {
       removeHeaderButton();
@@ -721,14 +732,35 @@
     load(route);
   }
 
+  function fromCall(node) {
+    while (node && node !== document.body) {
+      if (node.id && /call/i.test(node.id)) return true;
+      var cls = node.className;
+      if (typeof cls === "string" && /call/i.test(cls)) return true;
+      node = node.parentElement;
+    }
+    return false;
+  }
+
   var queued = false;
-  function queue() {
+  function queue(mutations) {
+    if (painting) return;
+    if (mutations && typeof mutations.length === "number") {
+      var relevant = false;
+      for (var i = 0; i < mutations.length; i++) {
+        if (!fromCall(mutations[i].target)) {
+          relevant = true;
+          break;
+        }
+      }
+      if (!relevant) return;
+    }
     if (queued) return;
     queued = true;
     setTimeout(function () {
       queued = false;
       paint();
-    }, 80);
+    }, 200);
   }
 
   window.addEventListener("resize", function () {
@@ -767,7 +799,11 @@
   function start() {
     markGuest();
     queue();
-    observer.observe(document.body, {childList: true, subtree: true, attributes: true, attributeFilter: ["class"]});
+    observer.observe(document.body, {childList: true, subtree: true});
+    setInterval(function () {
+      if (painting || !channelRoute()) return;
+      ensureJoinBar();
+    }, 1000);
   }
   if (document.body) start();
   else document.addEventListener("DOMContentLoaded", start);
